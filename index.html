@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Πολυχρηστική Λίστα Αγορών PWA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- PWA: ΣΥΝΔΕΣΗ MANIFEST (ΠΡΕΠΕΙ ΝΑ ΤΟ ΔΗΜΙΟΥΡΓΗΣΕΤΕ ΕΣΕΙΣ) -->
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+        .list-item {
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.1s;
+        }
+        .list-item:hover {
+            background-color: #f9fafb;
+        }
+        .completed {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container mx-auto p-4 md:p-8">
+        <!-- ΚΥΡΙΑ ΕΦΑΡΜΟΓΗ -->
+        <div id="main-content" class="hidden">
+            <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 text-center">Λίστα Αγορών</h1>
+            <div class="mb-4 bg-white p-6 rounded-xl card">
+                <p class="text-sm text-gray-500 mb-2">
+                    <span class="font-semibold text-indigo-500">ID Χρήστη:</span> 
+                    <span id="user-display">Φόρτωση...</span>
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="new-item-text" placeholder="Προσθήκη νέου αντικειμένου..." 
+                           class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-gray-700">
+                    <button id="add-item-btn" 
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out transform hover:scale-105">
+                        Προσθήκη
+                    </button>
+                </div>
+            </div>
+
+            <!-- ΛΙΣΤΑ ΑΝΤΙΚΕΙΜΕΝΩΝ -->
+            <div class="bg-white rounded-xl card overflow-hidden">
+                <ul id="shopping-list" class="divide-y divide-gray-100">
+                    <!-- Τα αντικείμενα θα φορτωθούν εδώ -->
+                </ul>
+                <div id="empty-state" class="p-6 text-center text-gray-500 hidden">
+                    Η λίστα σας είναι άδεια. Ήρθε η ώρα για ψώνια!
+                </div>
+            </div>
+            
+            <div class="mt-6 text-center">
+                <button id="clear-list-btn" 
+                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    Εκκαθάριση Ολοκληρωμένων
+                </button>
+            </div>
+        </div>
+        
+        <!-- MODAL ΔΙΑΜΟΡΦΩΣΗΣ FIREBASE (Εμφανίζεται αν δεν υπάρχει διαμόρφωση) -->
+        <div id="config-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white rounded-xl card p-8 w-full max-w-md">
+                <h2 class="text-2xl font-bold text-red-600 mb-4">Απαιτείται Διαμόρφωση Firebase</h2>
+                <p class="text-gray-700 mb-4">
+                    Για να λειτουργήσει αυτή η εφαρμογή, πρέπει να εισαγάγετε το αντικείμενο διαμόρφωσης (config object) του δικού σας Firebase project. Βρείτε το στην κονσόλα Firebase.
+                </p>
+                <p class="text-sm text-gray-500 mb-4">
+                    <span class="font-semibold">ΣΗΜΕΙΩΣΗ:</span> Αυτή η διαμόρφωση θα αποθηκευτεί τοπικά στο πρόγραμμα περιήγησής σας.
+                </p>
+                <textarea id="firebase-config-input" rows="6" 
+                          placeholder="{ apiKey: '...', authDomain: '...', projectId: '...', ... }"
+                          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 mb-4 font-mono text-sm"></textarea>
+                <button id="save-config-btn" 
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    Αποθήκευση & Εκκίνηση Εφαρμογής
+                </button>
+                <p id="config-error" class="mt-3 text-red-500 hidden text-sm"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA: ΣΥΝΔΕΣΗ SERVICE WORKER (ΠΡΕΠΕΙ ΝΑ ΤΟ ΔΗΜΙΟΥΡΓΗΣΕΤΕ ΕΣΕΙΣ) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').then(registration => {
+                    console.log('Service Worker registered: ', registration.scope);
+                }).catch(err => {
+                    console.error('Service Worker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+
+    <!-- FIREBASE MODULE IMPORTS -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // DOM ELEMENTS
+        const mainContentEl = document.getElementById('main-content');
+        const configModalEl = document.getElementById('config-modal');
+        const configInputEl = document.getElementById('firebase-config-input');
+        const saveConfigBtn = document.getElementById('save-config-btn');
+        const configErrorEl = document.getElementById('config-error');
+        const shoppingListEl = document.getElementById('shopping-list');
+        const newItemTextEl = document.getElementById('new-item-text');
+        const addItemBtn = document.getElementById('add-item-btn');
+        const clearListBtn = document.getElementById('clear-list-btn');
+        const userDisplayEl = document.getElementById('user-display');
+        const emptyStateEl = document.getElementById('empty-state');
+
+        // FIREBASE SETUP
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        const appId = 'pwa-shopping-list'; // Fixed app ID for public access (PWA ready)
+
+        // --- 1. CONFIGURATION AND INITIALIZATION ---
+
+        function loadConfig() {
+            try {
+                const storedConfig = localStorage.getItem('userFirebaseConfig');
+                return storedConfig ? JSON.parse(storedConfig) : null;
+            } catch (e) {
+                console.error("Error loading config from localStorage:", e);
+                return null;
+            }
+        }
+
+        function saveConfig(config) {
+            localStorage.setItem('userFirebaseConfig', JSON.stringify(config));
+        }
+
+        async function initializeAppAndAuth(config) {
+            try {
+                app = initializeApp(config);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Use Anonymous Auth for PWA deployment
+                await signInAnonymously(auth);
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userDisplayEl.textContent = userId;
+                        mainContentEl.classList.remove('hidden');
+                        configModalEl.classList.add('hidden');
+                        
+                        // Start listening for data after successful auth
+                        setupRealtimeListener();
+                    } else {
+                        // This should ideally not happen after signInAnonymously
+                        console.error("User not signed in.");
+                        userDisplayEl.textContent = 'Αποσυνδεδεμένος';
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                configErrorEl.textContent = `Σφάλμα Εκκίνησης: ${error.message}`;
+                configErrorEl.classList.remove('hidden');
+                configModalEl.classList.remove('hidden');
+                mainContentEl.classList.add('hidden');
+                // Clear potentially bad config
+                localStorage.removeItem('userFirebaseConfig');
+            }
+        }
+
+        // Handle config saving from modal
+        saveConfigBtn.addEventListener('click', () => {
+            try {
+                configErrorEl.classList.add('hidden');
+                const configString = configInputEl.value.trim();
+                const newConfig = JSON.parse(configString);
+                
+                if (!newConfig.apiKey || !newConfig.projectId) {
+                     throw new Error("Το αντικείμενο διαμόρφωσης φαίνεται ελλιπές.");
+                }
+
+                saveConfig(newConfig);
+                initializeAppAndAuth(newConfig);
+
+            } catch (e) {
+                console.error("Configuration input error:", e);
+                configErrorEl.textContent = `Μη έγκυρη μορφή JSON. Παρακαλώ ελέγξτε την είσοδο. ${e.message}`;
+                configErrorEl.classList.remove('hidden');
+            }
+        });
+
+        // Initial check for configuration
+        const initialConfig = loadConfig();
+        if (initialConfig) {
+            initializeAppAndAuth(initialConfig);
+        } else {
+            configModalEl.classList.remove('hidden');
+        }
+
+        // --- 2. FIRESTORE OPERATIONS ---
+        
+        // Helper to get the path to the public collection (shared list)
+        function getCollectionRef() {
+            // Using the public collection path for a collaborative shopping list
+            return collection(db, 'artifacts', appId, 'public', 'data', 'shoppingItems');
+        }
+
+        function renderList(items) {
+            shoppingListEl.innerHTML = '';
+            if (items.length === 0) {
+                emptyStateEl.classList.remove('hidden');
+            } else {
+                emptyStateEl.classList.add('hidden');
+            }
+
+            // Sort by completion status (incomplete first) and then by creation date
+            items.sort((a, b) => {
+                if (a.completed !== b.completed) {
+                    return a.completed ? 1 : -1; // Incomplete (false) comes first
+                }
+                return (a.createdAt || 0) - (b.createdAt || 0);
+            }).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'list-item flex items-center justify-between p-4 cursor-pointer';
+                li.setAttribute('data-id', item.id);
+
+                const textClass = item.completed ? 'completed' : 'text-gray-800';
+
+                li.innerHTML = `
+                    <div class="flex items-center flex-grow" onclick="window.toggleItem('${item.id}', ${item.completed})">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} class="mr-3 h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <span class="text-lg ${textClass} flex-grow">${item.text}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-400">από: ${item.createdBy.substring(0, 4)}...</span>
+                        <button onclick="window.deleteItem('${item.id}')" 
+                                class="text-red-400 hover:text-red-600 transition duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                shoppingListEl.appendChild(li);
+            });
+        }
+
+        function setupRealtimeListener() {
+            if (!db || !userId) return;
+
+            const q = query(getCollectionRef());
+
+            onSnapshot(q, (snapshot) => {
+                const items = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    items.push({ 
+                        id: doc.id, 
+                        text: data.text, 
+                        completed: data.completed,
+                        createdBy: data.createdBy,
+                        createdAt: data.createdAt ? data.createdAt.toMillis() : 0 
+                    });
+                });
+                renderList(items);
+            }, (error) => {
+                console.error("Error listening to Firestore:", error);
+                // Inform user about potential permission issues (important for PWA)
+                userDisplayEl.textContent = `${userId} (Σφάλμα Σύνδεσης)`;
+                alert('Σφάλμα σύνδεσης με τη βάση δεδομένων. Ελέγξτε τους κανόνες ασφαλείας του Firebase.');
+            });
+        }
+
+        // Add new item
+        addItemBtn.addEventListener('click', async () => {
+            const text = newItemTextEl.value.trim();
+            if (text === "" || !userId) return;
+
+            try {
+                await addDoc(getCollectionRef(), {
+                    text: text,
+                    completed: false,
+                    createdBy: userId,
+                    createdAt: Date.now()
+                });
+                newItemTextEl.value = '';
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        });
+        
+        // Toggle item status (exposed globally for inline click handlers)
+        window.toggleItem = async (id, isCompleted) => {
+            if (!db) return;
+            try {
+                const itemRef = doc(getCollectionRef(), id);
+                await updateDoc(itemRef, {
+                    completed: !isCompleted
+                });
+            } catch (e) {
+                console.error("Error updating document: ", e);
+            }
+        };
+
+        // Delete item (exposed globally for inline click handlers)
+        window.deleteItem = async (id) => {
+            if (!db) return;
+            try {
+                const itemRef = doc(getCollectionRef(), id);
+                await deleteDoc(itemRef);
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+            }
+        };
+        
+        // Clear completed items
+        clearListBtn.addEventListener('click', async () => {
+             if (!db) return;
+
+             try {
+                 const q = query(getCollectionRef(), where("completed", "==", true));
+                 const snapshot = await getDocs(q);
+                 
+                 if (snapshot.empty) return;
+
+                 // Use a batch write for efficiency
+                 const batch = writeBatch(db);
+                 snapshot.docs.forEach(d => {
+                     batch.delete(d.ref);
+                 });
+
+                 await batch.commit();
+             } catch (e) {
+                 console.error("Error clearing completed items: ", e);
+             }
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+{
+  "name": "Πολυχρηστική Λίστα Αγορών",
+  "short_name": "Λίστα Αγορών",
+  "description": "Μια κοινόχρηστη λίστα αγορών σε πραγματικό χρόνο, PWA-ready.",
+  "start_url": "./multi_shopping_list.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
+* **Σημείωση:** Θα χρειαστεί να δημιουργήσετε έναν φάκελο `/icons` και να βάλετε τα εικονίδιά σας εκεί.
+
+**2. `service-worker.js`**
+Αυτό το αρχείο επιτρέπει στην εφαρμογή να λειτουργεί εκτός σύνδεσης (offline) αποθηκεύοντας τα αρχεία στην cache.
+
+```javascript
+const CACHE_NAME = 'shopping-list-pwa-cache-v1';
+const urlsToCache = [
+    './multi_shopping_list.html',
+    './manifest.json',
+    // ... προσθέστε εδώ τα μονοπάτια για τα εικονίδιά σας (π.χ. '/icons/icon-192x192.png')
+];
+
+// Εγκατάσταση Service Worker & Caching των αρχείων
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {
+                console.log('Opened cache');
+                return cache.addAll(urlsToCache);
+            })
+    );
+});
+
+// Ενεργοποίηση: Καθαρισμός παλαιότερων caches
+self.addEventListener('activate', event => {
+    const cacheWhitelist = [CACHE_NAME];
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+});
+
+// Fetch: Επιστρέφει περιεχόμενο από την cache, αν είναι διαθέσιμο
+self.addEventListener('fetch', event => {
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => {
+                // Cache hit - επιστροφή της απάντησης
+                if (response) {
+                    return response;
+                }
+                // Καμία απάντηση στην cache - εκτελέστε κανονικό fetch
+                return fetch(event.request);
+            })
+    );
+});
+
+Αφού ανεβάσετε αυτά τα τρία αρχεία στο GitHub Pages, η εφαρμογή σας θα είναι έτοιμη για εγκατάσταση ως PWA! Μην ξεχάσετε να ρυθμίσετε και τους **Security Rules** στο Firebase ώστε να επιτρέπουν την ανάγνωση/εγγραφή στους αυθεντικοποιημένους χρήστες:
+
+```firestore
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Επιτρέπει σε οποιονδήποτε συνδεδεμένο χρήστη (ακόμα και ανώνυμα) να διαβάζει/γράφει
+    match /artifacts/pwa-shopping-list/public/data/shoppingItems/{itemId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
