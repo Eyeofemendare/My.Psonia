@@ -1,869 +1,872 @@
 <!DOCTYPE html>
 <html lang="el">
 <head>
- <meta charset="utf-8" />
- <meta name="viewport" content="width=device-width,initial-scale=1" />
- <title>Λίστα Αγορών — Κοινή (PWA)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Συνεργατική Λίστα Αγορών</title>
+    <!-- Tailwind CSS CDN για styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ρυθμίσεις PWA: Manifest και Service Worker -->
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        // ... existing manifest.json and service worker registration code ...
+        // Δημιουργία απλού manifest.json δυναμικά για PWA
+        const manifest = {
+            "name": "Λίστα Αγορών",
+            "short_name": "Ψώνια",
+            "description": "Συνεργατική Λίστα Αγορών σε πραγματικό χρόνο",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#0D9488",
+            "theme_color": "#0D9488",
+            "icons": [
+                {
+                    "src": "https://placehold.co/192x192/10b981/ffffff?text=Ψ",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "https://placehold.co/512x512/10b981/ffffff?text=Ψ",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
 
- <script src="https://cdn.tailwindcss.com"></script>
- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
- <meta name="theme-color" content="#4f46e5">
- <style>
-   :root { font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-   body { background: #f7f7fb; color: #111827; min-height:100vh; -webkit-font-smoothing:antialiased; }
-   .card { box-shadow: 0 10px 20px rgba(17,24,39,0.06); }
-   .list-item { transition: background-color .12s, transform .06s; }
-   .list-item:active { transform: scale(.998); }
-   .completed { text-decoration: line-through; color:#9CA3AF; }
-   .small-muted { font-size: .85rem; color:#6b7280; }
-   .priority-3 { border-left: 4px solid #dc2626; } /* πολύ επείγον - red */
-   .priority-2 { border-left: 4px solid #f59e0b; } /* επείγον - amber */
-   .priority-1 { border-left: 4px solid #10b981; } /* όταν μπορέσεις - green */
-   /* Dark Mode Fixes: Added 'select' for better text visibility (Αίτημα 3) */
-   .dark-mode { background: #0b1220; color: #e6eef8; }
-   .dark-mode .card { background: #071024; box-shadow: none; }
-   .dark-mode input, .dark-mode textarea, .dark-mode select { background: #071224; color: #e6eef8; border-color: #1f2937; } 
-   .thumb { width:48px; height:48px; object-fit:cover; border-radius:6px; cursor:pointer; }
-   .modal-backdrop { background: rgba(2,6,23,0.6); }
-   .small-desc { font-size: .9rem; color: #6b7280; }
-   .dark-mode .small-desc { color: #9fb2d4; }
- </style>
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        document.querySelector('link[rel="manifest"]').setAttribute('href', manifestUrl);
+
+        // Καταχώρηση Service Worker για λειτουργία PWA (μόνο βασική cache)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(registration => console.log('SW registered: ', registration.scope))
+                    .catch(error => console.log('SW registration failed: ', error));
+            });
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; }
+        .purchase-btn { transition: transform 0.1s; }
+        .purchase-btn:active { transform: scale(0.95); }
+        .list-item:hover .purchase-btn { opacity: 1; }
+        
+        /* Στυλ για Modals */
+        .modal {
+            transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+        }
+        .modal-content {
+            transition: transform 0.2s ease-in-out;
+        }
+        /* Χρώματα Προτεραιότητας */
+        .priority-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .priority-high { background-color: #ef4444; /* red-500 */ }
+        .priority-medium { background-color: #f59e0b; /* amber-500 */ }
+        .priority-low { background-color: #22c55e; /* green-500 */ }
+        
+        /* Νέο: Για τα φίλτρα λίστας */
+        .list-filter-chip {
+            transition: all 0.15s ease-in-out;
+        }
+        .list-filter-chip.active {
+            background-color: #0d9488; /* teal-700 */
+            color: white;
+            font-weight: 600;
+            border-color: #0d9488;
+        }
+        .list-filter-chip:not(.active):hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
-<body class="antialiased">
-
- <main class="max-w-4xl mx-auto p-4 md:p-8">
-   <header class="flex items-center justify-between mb-6">
-     <div>
-       <h1 class="text-4xl font-extrabold text-indigo-700 mb-1">Λίστα Αγορών</h1>
-       <div class="small-muted">Κοινή λίστα για εσένα και τη σύζυγό σου — όλα συγχρονίζονται σε πραγματικό χρόνο.</div>
-     </div>
-
-     <div class="flex items-center gap-3">
-       <button id="menuBtn" class="p-2 bg-gray-100 rounded-full dark:bg-gray-700 text-gray-800 dark:text-white">
-           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-       </button>
-       <button id="toggleTheme" class="p-2 bg-gray-100 rounded-full dark:bg-gray-700 text-gray-800 dark:text-yellow-400">
-           <svg id="sunIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-           <svg id="moonIcon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-       </button>
-     </div>
-   </header>
-
-   <section class="mb-4">
-     <div class="bg-white p-4 rounded-xl card w-full">
-       <div class="flex flex-col md:flex-row items-center gap-3">
-         <label for="listSelect" class="text-sm small-muted">Επιλογή Λίστας:</label>
-         <select id="listSelect" class="p-2 border border-gray-200 rounded-md flex-1"></select>
-       </div>
-     </div>
-   </section>
-   
-   <section class="mb-4 flex flex-col md:flex-row gap-3 items-center">
-     <div class="flex gap-3">
-       <button id="openAddModal" class="bg-indigo-600 text-white px-4 py-3 rounded-lg shadow">Προσθήκη αντικειμένου</button>
-       <button id="filterShowAll" class="px-3 py-2 border rounded">Όλα</button>
-       <button id="filterShowPending" class="px-3 py-2 border rounded">Μη ολοκληρωμένα</button>
-     </div>
-     <div class="ml-auto small-muted text-right">
-       Σειρά: <span class="font-medium">Πολύ επείγον → Επείγον → Όταν μπορέσεις</span>
-     </div>
-   </section>
-
-   <section class="bg-white rounded-xl card overflow-hidden p-2">
-     <ul id="shoppingList" class="divide-y divide-gray-100">
-       </ul>
-     <div id="emptyState" class="p-6 text-center text-gray-500 hidden">
-       Η λίστα είναι άδεια — πρόσθεσε ένα προϊόν!
-     </div>
-   </section>
-
-   <div class="mt-5 flex justify-end items-center">
-     <div class="small-muted">Οι εικόνες αποθηκεύονται ως μικρογραφίες (base64) στο έγγραφο - αν θες, μπορούμε να μεταβάλουμε σε Firebase Storage.</div>
-   </div>
- </main>
-
- <div id="menuModal" class="hidden fixed inset-0 z-40 flex items-center justify-center modal-backdrop">
-     <div class="bg-white rounded-xl w-full max-w-lg p-6 card relative">
-         <button id="closeMenuModal" class="absolute top-3 right-3 text-gray-600">✕</button>
-         <h2 class="text-xl font-semibold mb-6 text-indigo-700 dark:text-indigo-400">Μενού Λίστας Αγορών</h2>
-
-         <div class="mb-6 pb-4 border-b">
-             <h3 class="font-bold mb-2">Αλλαγή Ονόματος Χρήστη</h3>
-             <div class="flex gap-2 items-center">
-                 <input id="display-name" placeholder="Όνομα (μπορεί να αλλάξει)" class="p-2 border border-gray-200 rounded-md flex-1" />
-                 <button id="save-name-menu" class="bg-indigo-600 text-white px-3 py-2 rounded-md">Αποθήκευση</button>
-             </div>
-             <div id="userIdDisplay" class="text-xs small-muted mt-2"></div>
-         </div>
-
-         <div class="mb-6 pb-4 border-b">
-             <h3 class="font-bold mb-2">Διαχείριση Λιστών (Εισαγωγή & Επεξεργασία)</h3>
-             <div class="flex gap-2 mb-2">
-                 <button id="addListBtnMenu" class="bg-indigo-600 text-white px-3 py-2 rounded-md flex-1">Προσθήκη Λίστας</button>
-                 <button id="editListBtnMenu" class="bg-yellow-500 text-white px-3 py-2 rounded-md flex-1">Επεξεργασία Λίστας</button>
-             </div>
-             <button id="removeListBtnMenu" class="bg-red-500 text-white px-3 py-2 rounded-md w-full">Διαγραφή Τρέχουσας Λίστας</button>
-         </div>
-
-         <div>
-             <h3 class="font-bold mb-3">Εκκαθάριση</h3>
-             <button id="clearDoneBtnMenu" class="bg-red-500 text-white px-4 py-2 rounded-md w-full">Εκκαθάριση Ολοκληρωμένων</button>
-         </div>
-     </div>
- </div>
- <div id="itemModal" class="hidden fixed inset-0 z-40 flex items-center justify-center modal-backdrop">
-   <div class="bg-white rounded-xl w-full max-w-2xl p-6 card relative">
-     <button id="closeItemModal" class="absolute top-3 right-3 text-gray-600">✕</button>
-     <h2 id="modalTitle" class="text-xl font-semibold mb-3">Προσθήκη προϊόντος</h2>
-
-     <div class="grid grid-cols-1 gap-3">
-       <label>Όνομα προϊόντος</label>
-       <input id="itemName" class="p-2 border rounded-md w-full" placeholder="π.χ. Γάλα 1L" />
-
-       <label>Περιγραφή (εμφανίζεται κάτω από το προϊόν)</label>
-       <textarea id="itemDescription" rows="3" class="p-2 border rounded-md w-full" placeholder="Περιγραφή..."></textarea>
-
-       <label>Σημειώσεις</label>
-       <textarea id="itemNotes" rows="2" class="p-2 border rounded-md w-full" placeholder="Σημειώσεις / υπενθύμιση..."></textarea>
-
-       <label>Επιλογή λιστών (μπορείς να επιλέξεις περισσότερες από 1)</label>
-       <div id="listsCheckboxes" class="flex flex-wrap gap-2"></div>
-
-       <label>Προτεραιότητα</label>
-       <select id="itemPriority" class="p-2 border rounded-md w-full">
-         <option value="1">Όταν μπορέσεις</option>
-         <option value="2">Επείγον</option>
-         <option value="3">Πολύ επείγον</option>
-       </select>
-
-       <label>Φωτογραφία (προαιρετικά)</label>
-       <input id="itemImageInput" type="file" accept="image/*" class="p-2" />
-       <div id="imagePreview" class="mt-2"></div>
-
-       <div class="flex justify-end gap-3 mt-4">
-         <button id="saveItemBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Αποθήκευση</button>
-         <button id="cancelItemBtn" class="px-4 py-2 border rounded-md">Άκυρο</button>
-       </div>
-     </div>
-   </div>
- </div>
-
- <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
-   <div class="bg-white rounded-xl w-full max-w-lg p-6 card relative">
-     <button id="closeDetailModal" class="absolute top-3 right-3 text-gray-600">✕</button>
-     <div id="detailImageWrap" class="mb-4 text-center"></div>
-     <h3 id="detailName" class="text-2xl font-bold mb-2"></h3>
-     <div id="detailMeta" class="small-muted mb-3"></div>
-     <div id="detailDescription" class="mb-3 small-desc"></div>
-     <div id="detailNotes" class="mb-4 small-desc"></div>
-     <div class="flex gap-3 justify-end">
-       <button id="editItemBtn" class="bg-yellow-500 px-4 py-2 rounded-md text-white">Επεξεργασία</button>
-       <button id="deleteItemBtn" class="bg-red-500 px-4 py-2 rounded-md text-white">Διαγραφή</button>
-     </div>
-   </div>
- </div>
-
- <div id="listModal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
-   <div class="bg-white rounded-xl w-full max-w-md p-6 card relative">
-     <button id="closeListModal" class="absolute top-3 right-3 text-gray-600">✕</button>
-     <h3 id="listModalTitle" class="text-xl font-semibold mb-3">Νέα λίστα</h3>
-     <label>Όνομα λίστας</label>
-     <input id="listNameInput" class="p-2 border rounded-md w-full mb-3" />
-     <div class="flex justify-end gap-3">
-       <button id="saveListBtn" class="bg-indigo-600 px-4 py-2 rounded-md text-white">Αποθήκευση</button>
-       <button id="cancelListBtn" class="px-4 py-2 border rounded-md">Άκυρο</button>
-     </div>
-   </div>
- </div>
-
- <div id="imageModal" class="hidden fixed inset-0 z-60 flex items-center justify-center modal-backdrop">
-   <div class="bg-transparent relative">
-     <button id="closeImageModal" class="absolute -top-10 right-0 text-white text-2xl">✕</button>
-     <img id="imageModalImg" src="" alt="Φωτογραφία" class="max-w-screen-md max-h-screen rounded-md shadow-lg" />
-   </div>
- </div>
-
- <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
- <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-
- <script>
- /*************************************************************************
-  * Firebase config (user-provided) - already given
-  *************************************************************************/
- const firebaseConfig = {
-   apiKey: "AIzaSyAa9lz_EqEWx0OTfvVdIgmenNrDRy9nbTI",
-   authDomain: "my-psonia.firebaseapp.com",
-   projectId: "my-psonia",
-   storageBucket: "my-psonia.firebasestorage.app",
-   messagingSenderId: "557076927667",
-   appId: "1:557076927667:web:0a09e333d63497b8460cc6",
-   measurementId: "G-1S6RYCVRZ8"
- };
-
- firebase.initializeApp(firebaseConfig);
- const db = firebase.firestore();
-
- // Collections:
- // - 'lists' (documents: each list doc contains { name, createdAt })
- // - 'items' (root collection with all items)
- //    { text, description, notes, priority (1..3), ownerId, ownerName, lists: [listIds], image (base64 string or null), done (bool), createdAt, completedAt }
- const listsCol = db.collection('lists');
-
- // DOM refs
- const listSelect = document.getElementById('listSelect');
- 
- // Menu Modal Refs (Αίτημα 4)
- const menuBtn = document.getElementById('menuBtn');
- const menuModal = document.getElementById('menuModal');
- const closeMenuModal = document.getElementById('closeMenuModal');
- const addListBtnMenu = document.getElementById('addListBtnMenu');
- const editListBtnMenu = document.getElementById('editListBtnMenu');
- const removeListBtnMenu = document.getElementById('removeListBtnMenu');
- const clearDoneBtnMenu = document.getElementById('clearDoneBtnMenu');
- 
- // List Modal Refs
- const listModal = document.getElementById('listModal');
- const listModalTitle = document.getElementById('listModalTitle');
- const listNameInput = document.getElementById('listNameInput');
- const saveListBtn = document.getElementById('saveListBtn');
- const cancelListBtn = document.getElementById('cancelListBtn');
- const closeListModal = document.getElementById('closeListModal');
-
- const openAddModal = document.getElementById('openAddModal');
- const itemModal = document.getElementById('itemModal');
- const closeItemModal = document.getElementById('closeItemModal');
- const modalTitle = document.getElementById('modalTitle');
- const itemName = document.getElementById('itemName');
- const itemDescription = document.getElementById('itemDescription');
- const itemNotes = document.getElementById('itemNotes');
- const listsCheckboxes = document.getElementById('listsCheckboxes');
- const itemPriority = document.getElementById('itemPriority');
- const itemImageInput = document.getElementById('itemImageInput');
- const imagePreview = document.getElementById('imagePreview');
- const saveItemBtn = document.getElementById('saveItemBtn');
- const cancelItemBtn = document.getElementById('cancelItemBtn');
-
- const shoppingList = document.getElementById('shoppingList');
- const emptyState = document.getElementById('emptyState');
-
- const detailModal = document.getElementById('detailModal');
- const closeDetailModal = document.getElementById('closeDetailModal');
- const detailName = document.getElementById('detailName');
- const detailMeta = document.getElementById('detailMeta');
- const detailDescription = document.getElementById('detailDescription');
- const detailNotes = document.getElementById('detailNotes');
- const detailImageWrap = document.getElementById('detailImageWrap');
- const editItemBtn = document.getElementById('editItemBtn');
- const deleteItemBtn = document.getElementById('deleteItemBtn');
-
- const imageModal = document.getElementById('imageModal');
- const imageModalImg = document.getElementById('imageModalImg');
- const closeImageModal = document.getElementById('closeImageModal');
-
- // Name/User Refs
- const displayNameInput = document.getElementById('display-name');
- const saveNameBtnMenu = document.getElementById('save-name-menu');
- const userIdDisplay = document.getElementById('userIdDisplay');
-
- // Theme Refs (Αίτημα 2)
- const toggleTheme = document.getElementById('toggleTheme');
- const sunIcon = document.getElementById('sunIcon');
- const moonIcon = document.getElementById('moonIcon');
-
- const filterShowAll = document.getElementById('filterShowAll');
- const filterShowPending = document.getElementById('filterShowPending');
-
- // Local user id & name
- let userId = localStorage.getItem('ps_user_id');
- if (!userId) {
-   userId = 'u_' + Math.random().toString(36).slice(2,9);
-   localStorage.setItem('ps_user_id', userId);
- }
- userIdDisplay.textContent = 'ID: ' + userId;
-
- let userName = localStorage.getItem('ps_user_name') || '';
- displayNameInput.value = userName;
-
- saveNameBtnMenu.addEventListener('click', () => {
-   userName = displayNameInput.value.trim();
-   localStorage.setItem('ps_user_name', userName);
-   saveNameBtnMenu.textContent = 'Αποθηκεύτηκε ✓';
-   setTimeout(()=> saveNameBtnMenu.textContent = 'Αποθήκευση', 1200);
-   // Κλείσιμο Menu Modal μετά την αποθήκευση ονόματος (Αίτημα 1)
-   menuModal.classList.add('hidden');
- });
-
- // Dark mode (Αίτημα 2)
- let darkMode = localStorage.getItem('ps_dark_mode') === '1';
- function applyTheme() {
-   if (darkMode) {
-       document.body.classList.add('dark-mode');
-       if (sunIcon && moonIcon) {
-           sunIcon.classList.add('hidden');
-           moonIcon.classList.remove('hidden');
-       }
-   } else {
-       document.body.classList.remove('dark-mode');
-       if (sunIcon && moonIcon) {
-           sunIcon.classList.remove('hidden');
-           moonIcon.classList.add('hidden');
-       }
-   }
- }
- applyTheme();
- toggleTheme.addEventListener('click', () => {
-   darkMode = !darkMode;
-   localStorage.setItem('ps_dark_mode', darkMode ? '1' : '0');
-   applyTheme();
- });
-
- // Menu Modal Logic (Αίτημα 4)
- menuBtn.addEventListener('click', () => {
-     menuModal.classList.remove('hidden');
- });
- closeMenuModal.addEventListener('click', () => {
-     menuModal.classList.add('hidden');
- });
-
- // State
- let lists = []; // { id, name }
- let selectedListId = null;
- let unsubscribeItems = null;
- let allItemsCache = []; // cache snapshot docs for client-side sort/filter
-
- // ---------- Lists CRUD ----------
- async function loadLists() {
-   const snap = await listsCol.orderBy('createdAt','asc').get();
-   lists = [];
-   snap.forEach(d => lists.push({ id: d.id, ...d.data() }));
-   renderListsSelect();
-   
-   // Εάν υπάρχουν λίστες, επιλογή 'all' ως default (Αίτημα 6)
-   if (!selectedListId && lists.length) {
-     selectedListId = 'all';
-   }
-   // Εάν δεν υπάρχουν λίστες, δημιουργία default (όπως πριν)
-   if (!selectedListId && lists.length === 0) {
-     const res = await listsCol.add({ name: 'Κύρια', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-     selectedListId = res.id;
-     lists.push({ id: res.id, name: 'Κύρια' });
-   }
-
-   if (selectedListId) listSelect.value = selectedListId;
-   startItemsListener();
-   renderListsCheckboxes();
- }
-
- function renderListsSelect() {
-   listSelect.innerHTML = '';
-   
-   // Προσθήκη επιλογής "Όλες οι Λίστες (Όλα)" (Αίτημα 6)
-   const allOpt = document.createElement('option');
-   allOpt.value = 'all';
-   allOpt.textContent = 'Όλες οι Λίστες (Όλα)'; 
-   listSelect.appendChild(allOpt);
-   
-   lists.forEach(l => {
-     const opt = document.createElement('option');
-     opt.value = l.id; opt.textContent = l.name;
-     listSelect.appendChild(opt);
-   });
- }
-
- function renderListsCheckboxes() {
-   listsCheckboxes.innerHTML = '';
-   lists.forEach(l => {
-     const id = l.id;
-     const wrap = document.createElement('label');
-     wrap.className = 'flex items-center gap-2 p-1';
-     const cb = document.createElement('input');
-     cb.type = 'checkbox';
-     cb.value = id;
-     cb.className = 'h-4 w-4';
-     wrap.appendChild(cb);
-     const span = document.createElement('span');
-     span.textContent = l.name;
-     wrap.appendChild(span);
-     listsCheckboxes.appendChild(wrap);
-   });
- }
- 
- // New handlers for menu buttons (Αίτημα 4)
- addListBtnMenu.addEventListener('click', () => {
-   menuModal.classList.add('hidden');
-   openListModal('add');
- });
-
- editListBtnMenu.addEventListener('click', () => {
-   if (!selectedListId || selectedListId === 'all') return alert('Επίλεξε μια συγκεκριμένη λίστα πρώτα.');
-   menuModal.classList.add('hidden');
-   openListModal('edit');
- });
-
- removeListBtnMenu.addEventListener('click', async () => {
-   if (!selectedListId || selectedListId === 'all') return alert('Επίλεξε μια συγκεκριμένη λίστα πρώτα.');
-   
-   // Προειδοποίηση διαγραφής (Αίτημα 5)
-   const listName = listSelect.options[listSelect.selectedIndex].text;
-   const ok = confirm(`Είστε σίγουρος ότι θέλετε να διαγράψετε τη λίστα "${listName}";\n(τα προϊόντα θα παραμείνουν ανήκουν και σε άλλες λίστες)`);
-   if (!ok) return;
-   
-   try {
-     await listsCol.doc(selectedListId).delete();
-     // Remove from local arrays and UI
-     selectedListId = null;
-     await loadLists();
-     menuModal.classList.add('hidden'); // Κλείσιμο modal μετά τη διαγραφή
-   } catch (err) {
-     console.error(err);
-     alert('Σφάλμα κατά τη διαγραφή λίστας.');
-   }
- });
-
- function openListModal(mode) {
-   listModal.classList.remove('hidden');
-   if (mode === 'add') {
-     listModalTitle.textContent = 'Δημιουργία νέας λίστας';
-     listNameInput.value = '';
-     saveListBtn.dataset.mode = 'add';
-   } else {
-     listModalTitle.textContent = 'Επεξεργασία λίστας';
-     const cur = lists.find(l => l.id === selectedListId);
-     listNameInput.value = cur ? cur.name : '';
-     saveListBtn.dataset.mode = 'edit';
-   }
- }
- closeListModal.addEventListener('click', ()=> listModal.classList.add('hidden'));
- cancelListBtn.addEventListener('click', ()=> listModal.classList.add('hidden'));
-
- // ΔΙΟΡΘΩΣΗ: Κλείσιμο modal ΜΟΝΟ μετά το await (Αίτημα 1)
- saveListBtn.addEventListener('click', async () => {
-   const name = listNameInput.value.trim();
-   if (!name) return alert('Δώσε όνομα λίστας.');
-   const mode = saveListBtn.dataset.mode;
-   try {
-     if (mode === 'add') {
-       const res = await listsCol.add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-       lists.push({ id: res.id, name });
-       selectedListId = res.id;
-     } else {
-       await listsCol.doc(selectedListId).update({ name });
-     }
-     // Κλείσιμο modal μετά την ΕΠΙΤΥΧΗ αποθήκευση (Αίτημα 1)
-     listModal.classList.add('hidden'); 
-     await loadLists();
-     listSelect.value = selectedListId;
-     renderListsCheckboxes();
-   } catch (err) {
-     console.error(err); alert('Σφάλμα αποθήκευσης λίστας.');
-   }
- });
-
- listSelect.addEventListener('change', (e) => {
-   selectedListId = e.target.value;
-   startItemsListener();
- });
-
- // ---------- Items listener & render (Τροποποιημένο για "Όλα") ----------
- function startItemsListener() {
-   // unsubscribe previous
-   if (unsubscribeItems) unsubscribeItems();
-   if (!selectedListId) return;
-   
-   let itemsQuery = db.collection('items'); // Βάση: Όλα τα items
-
-   if (selectedListId !== 'all') {
-     // Αν δεν είναι επιλεγμένο το 'all', φιλτράρουμε με το array-contains
-     itemsQuery = itemsQuery.where('lists', 'array-contains', selectedListId);
-   } 
-   // Αν είναι 'all', η αναζήτηση επιστρέφει όλα τα items (itemsQuery = db.collection('items'))
-
-   unsubscribeItems = itemsQuery.onSnapshot(snapshot => {
-     allItemsCache = [];
-     snapshot.forEach(doc => {
-       const d = doc.data(); d.id = doc.id;
-       allItemsCache.push(d);
-     });
-     renderItems();
-   }, err => {
-     console.error('snapshot err', err);
-     // fallback: show empty
-     allItemsCache = [];
-     renderItems();
-   });
- }
-
- // Helper to sort (UNCHANGED)
- function sortItems(a,b) {
-   if (a.done !== b.done) return a.done ? 1 : -1; // done last
-   if (!a.done) {
-     // both pending
-     const pa = (a.priority||1), pb = (b.priority||1);
-     if (pa !== pb) return pb - pa; // higher priority first
-     const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-     const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-     return ta - tb;
-   } else {
-     // both done
-     const ca = a.completedAt && a.completedAt.toMillis ? a.completedAt.toMillis() : 0;
-     const cb = b.completedAt && b.completedAt.toMillis ? b.completedAt.toMillis() : 0;
-     return ca - cb;
-   }
- }
-
- let currentFilter = 'all';
- filterShowAll.addEventListener('click', () => { currentFilter = 'all'; renderItems(); });
- filterShowPending.addEventListener('click', () => { currentFilter = 'pending'; renderItems(); });
-
- function renderItems() {
-   shoppingList.innerHTML = '';
-   if (!allItemsCache.length) {
-     emptyState.classList.remove('hidden');
-     return;
-   } else {
-     emptyState.classList.add('hidden');
-   }
-   // filter by pending/all
-   let arr = allItemsCache.slice();
-   if (currentFilter === 'pending') arr = arr.filter(i => !i.done);
-   arr.sort(sortItems);
-   arr.forEach(item => {
-     const li = document.createElement('li');
-     li.className = `list-item p-4 flex items-start justify-between ${'priority-' + (item.priority || 1)}`;
-     li.dataset.id = item.id;
-
-     // Left: toggle + text
-     const left = document.createElement('div');
-     left.className = 'flex gap-3 items-start';
-
-     const chkBtn = document.createElement('button');
-     chkBtn.className = 'w-9 h-9 rounded-full flex items-center justify-center border border-gray-200 mt-1';
-     chkBtn.innerHTML = item.done ? '✔' : '';
-     chkBtn.title = 'Σήμανση ως αγορασμένο';
-     chkBtn.addEventListener('click', async (e) => {
-       e.stopPropagation();
-       try {
-         const newDone = !item.done;
-         const updateObj = { done: newDone };
-         if (newDone) updateObj.completedAt = firebase.firestore.FieldValue.serverTimestamp();
-         else updateObj.completedAt = null;
-         await db.collection('items').doc(item.id).update(updateObj);
-         // will reorder via snapshot
-       } catch (err) {
-         console.error(err); alert('Σφάλμα ενημέρωσης.');
-       }
-     });
-
-     left.appendChild(chkBtn);
-
-     const textWrap = document.createElement('div');
-     textWrap.className = 'min-w-0';
-     const title = document.createElement('div');
-     title.className = item.done ? 'completed font-medium' : 'font-medium';
-     title.textContent = item.text || '(Χωρίς όνομα)';
-
-     // description under product as small text
-     const desc = document.createElement('div');
-     desc.className = 'small-desc mt-1';
-     desc.textContent = item.description || '';
-     desc.style.fontSize = '0.92rem';
-
-     // thumbnail
-     if (item.image) {
-       const img = document.createElement('img');
-       img.src = item.image;
-       img.className = 'thumb mr-2';
-       img.addEventListener('click', (ev) => {
-         ev.stopPropagation();
-         openImageModal(item.image);
-       });
-       // place image before title
-       const row = document.createElement('div');
-       row.className = 'flex items-start gap-3';
-       row.appendChild(img);
-       const col = document.createElement('div');
-       col.appendChild(title);
-       col.appendChild(desc);
-       row.appendChild(col);
-       textWrap.appendChild(row);
-     } else {
-       textWrap.appendChild(title);
-       textWrap.appendChild(desc);
-     }
-
-     // meta line small
-     const meta = document.createElement('div');
-     meta.className = 'text-xs small-muted mt-1';
-     const owner = item.ownerName || (item.ownerId || 'Άγνωστος');
-     const prioMap = { '3':'Πολύ επείγον', '2':'Επείγον', '1':'Όταν μπορέσεις' };
-     const pText = prioMap[String(item.priority || 1)];
-     meta.textContent = `${owner} • ${pText}`;
-     textWrap.appendChild(meta);
-
-     left.appendChild(textWrap);
-
-     // Right: no edit/delete here (per request); all edit/delete in detail modal
-     const right = document.createElement('div');
-     right.className = 'flex flex-col gap-2 items-end';
-
-     // if item belongs to another user, show small badge
-     if (item.ownerId && item.ownerId !== userId) {
-       const badge = document.createElement('span');
-       badge.className = 'text-xs px-2 py-1 rounded bg-gray-100 small-muted';
-       badge.textContent = item.ownerName || 'Άλλος';
-       right.appendChild(badge);
-     }
-
-     // Show priority label
-     const prLbl = document.createElement('div');
-     prLbl.className = 'text-sm font-medium small-muted';
-     prLbl.textContent = pText;
-     right.appendChild(prLbl);
-
-     li.appendChild(left);
-     li.appendChild(right);
-
-     // click to open detail modal
-     li.addEventListener('click', () => openDetailModal(item));
-
-     shoppingList.appendChild(li);
-   });
- }
-
- // ---------- Add/Edit item logic (UNCHANGED) ----------
- let editingItemId = null;
-
- openAddModal.addEventListener('click', () => openItemModal());
- closeItemModal.addEventListener('click', () => itemModal.classList.add('hidden'));
- cancelItemBtn.addEventListener('click', () => itemModal.classList.add('hidden'));
-
- function openItemModal(item = null) {
-   itemModal.classList.remove('hidden');
-   if (item) {
-     modalTitle.textContent = 'Επεξεργασία προϊόντος';
-     editingItemId = item.id;
-     itemName.value = item.text || '';
-     itemDescription.value = item.description || '';
-     itemNotes.value = item.notes || '';
-     itemPriority.value = item.priority ? String(item.priority) : '1';
-     // set lists checkboxes
-     const cbs = listsCheckboxes.querySelectorAll('input[type=checkbox]');
-     cbs.forEach(cb => cb.checked = item.lists && item.lists.includes(cb.value));
-     // image preview
-     if (item.image) imagePreview.innerHTML = `<img src="${item.image}" class="thumb" />`;
-     else imagePreview.innerHTML = '';
-     saveItemBtn.textContent = 'Ενημέρωση';
-   } else {
-     modalTitle.textContent = 'Προσθήκη προϊόντος';
-     editingItemId = null;
-     itemName.value = '';
-     itemDescription.value = '';
-     itemNotes.value = '';
-     itemPriority.value = '1';
-     const cbs = listsCheckboxes.querySelectorAll('input[type=checkbox]');
-     cbs.forEach(cb => cb.checked = (cb.value === selectedListId || selectedListId === 'all' && cb.value === lists[0].id)); // default select current list or first list if "all" is selected
-     itemImageInput.value = '';
-     imagePreview.innerHTML = '';
-     saveItemBtn.textContent = 'Αποθήκευση';
-   }
- }
-
- // image input to base64 preview
- itemImageInput.addEventListener('change', async (e) => {
-   const file = e.target.files[0];
-   if (!file) { imagePreview.innerHTML = ''; return; }
-   const reader = new FileReader();
-   reader.onload = () => {
-     const data = reader.result;
-     imagePreview.innerHTML = `<img src="${data}" class="thumb" />`;
-     imagePreview.dataset.base64 = data;
-   };
-   reader.readAsDataURL(file);
- });
-
- async function gatherSelectedListsFromModal() {
-   const cbs = listsCheckboxes.querySelectorAll('input[type=checkbox]');
-   const sel = [];
-   cbs.forEach(cb => { if (cb.checked) sel.push(cb.value); });
-   // ensure at least one list is selected if none are checked
-   if (sel.length === 0 && lists.length > 0) sel.push(lists[0].id);
-   return sel;
- }
-
- // ΔΙΟΡΘΩΣΗ: Κλείσιμο modal ΜΟΝΟ μετά το await (Αίτημα 1)
- saveItemBtn.addEventListener('click', async () => {
-   const text = itemName.value.trim();
-   if (!text) return alert('Δώσε όνομα προϊόντος.');
-   const description = itemDescription.value.trim();
-   const notes = itemNotes.value.trim();
-   const priority = parseInt(itemPriority.value || '1', 10);
-   const listsSelected = await gatherSelectedListsFromModal();
-   const imageBase64 = imagePreview.dataset.base64 || null;
-
-   const payload = {
-     text,
-     description,
-     notes,
-     priority,
-     lists: listsSelected,
-     image: imageBase64,
-     ownerId: userId,
-     ownerName: userName || '',
-     done: false,
-     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-     completedAt: null
-   };
-
-   try {
-     if (editingItemId) {
-       // update existing
-       const updateObj = {
-         text, description, notes, priority,
-         lists: listsSelected, image: imageBase64, ownerName: userName || ''
-       };
-       await db.collection('items').doc(editingItemId).update(updateObj);
-     } else {
-       // create new item
-       await db.collection('items').add(payload);
-     }
-     // Κλείσιμο modal μετά την ΕΠΙΤΥΧΗ αποθήκευση (Αίτημα 1)
-     itemModal.classList.add('hidden'); 
-     // reset
-     imagePreview.innerHTML = '';
-     delete imagePreview.dataset.base64;
-   } catch (err) {
-     console.error(err); alert('Σφάλμα αποθήκευσης προϊόντος.');
-   }
- });
-
- // ---------- Detail modal ----------
- let currentDetailItem = null;
- function openDetailModal(item) {
-   currentDetailItem = item;
-   detailName.textContent = item.text || '(χωρίς όνομα)';
-   const owner = item.ownerName || (item.ownerId || 'Άγνωστος');
-   const prioMap = { '3':'Πολύ επείγον', '2':'Επείγον', '1':'Όταν μπορέσεις' };
-   const pText = prioMap[String(item.priority || 1)];
-   detailMeta.textContent = `${owner} • ${pText}`;
-   detailDescription.textContent = item.description || '(χωρίς περιγραφή)';
-   detailNotes.textContent = item.notes ? 'Σημειώσεις: ' + item.notes : '';
-   if (item.image) {
-     detailImageWrap.innerHTML = `<img src="${item.image}" alt="Φωτογραφία" class="mx-auto max-h-64 rounded-md cursor-pointer" />`;
-     detailImageWrap.querySelector('img').addEventListener('click', ()=> openImageModal(item.image));
-   } else detailImageWrap.innerHTML = '';
-   detailModal.classList.remove('hidden');
- }
- closeDetailModal.addEventListener('click', ()=> detailModal.classList.add('hidden'));
-
- editItemBtn.addEventListener('click', () => {
-   detailModal.classList.add('hidden');
-   openItemModal(currentDetailItem);
- });
-
- deleteItemBtn.addEventListener('click', async () => {
-   if (!currentDetailItem) return;
-   // Προειδοποίηση διαγραφής (Αίτημα 5)
-   const ok = confirm('Είστε σίγουρος ότι θέλετε να διαγράψετε αυτό το προϊόν; Αυτή η ενέργεια είναι μη αναστρέψιμη.');
-   if (!ok) return;
-   try {
-     await db.collection('items').doc(currentDetailItem.id).delete();
-     detailModal.classList.add('hidden');
-   } catch (err) {
-     console.error(err); alert('Σφάλμα κατά τη διαγραφή.');
-   }
- });
-
- // ---------- Image modal (UNCHANGED) ----------
- function openImageModal(dataUrl) {
-   imageModalImg.src = dataUrl;
-   imageModal.classList.remove('hidden');
- }
- closeImageModal.addEventListener('click', () => imageModal.classList.add('hidden'));
-
- // ---------- Clear done (Μεταφέρθηκε στο Menu) ----------
- clearDoneBtnMenu.addEventListener('click', async () => {
-   // Προειδοποίηση διαγραφής (Αίτημα 5)
-   const ok = confirm('Να αφαιρεθούν όλα τα ολοκληρωμένα αντικείμενα από την τρέχουσα προβολή;');
-   if (!ok) return;
-   try {
-     let q;
-     if (selectedListId === 'all') {
-         // Διαγραφή όλων των ολοκληρωμένων αντικειμένων (ανεξάρτητα από λίστα)
-         q = await db.collection('items').where('done','==',true).get();
-     } else {
-         // Διαγραφή ολοκληρωμένων αντικειμένων που ανήκουν στην τρέχουσα λίστα
-         q = await db.collection('items').where('lists', 'array-contains', selectedListId).where('done','==',true).get();
-     }
-     
-     const batch = db.batch();
-     q.forEach(doc => batch.delete(doc.ref));
-     await batch.commit();
-
-     menuModal.classList.add('hidden'); // Κλείσιμο modal μετά την εκκαθάριση (Αίτημα 1)
-   } catch (err) {
-     console.error(err); alert('Σφάλμα κατά την εκκαθάριση.');
-   }
- });
-
- // ---------- Initial load ----------
- async function initialSetup() {
-   const snap = await listsCol.get();
-   if (snap.empty) {
-     const d = await listsCol.add({ name: 'Κύρια', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-     selectedListId = d.id;
-   }
-   await loadLists();
- }
- initialSetup().catch(err => console.error('init err',err));
-
- // ------- Re-render lists checkboxes whenever lists change live -------
- listsCol.onSnapshot(() => {
-   loadLists().catch(()=>{});
- });
-
- // ---------- Service Worker registration (simple blob) ----------
- (async function registerSW() {
-   if (!('serviceWorker' in navigator)) return;
-   const swCode = `
-     const CACHE = 'shopping-pwa-v1';
-     const CORE = ['/', location.pathname || '/', '/manifest.json'];
-     self.addEventListener('install', e => {
-       self.skipWaiting();
-       e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, {cache: 'reload'}))).catch(()=>{})));
-     });
-     self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-     self.addEventListener('fetch', e => {
-       if (e.request.method !== 'GET') return;
-       e.respondWith(caches.match(e.request).then(r=> r || fetch(e.request).catch(()=> caches.match('/'))));
-     });
-   `;
-   try {
-     const blob = new Blob([swCode], { type: 'application/javascript' });
-     const swURL = URL.createObjectURL(blob);
-     await navigator.serviceWorker.register(swURL);
-     console.log('SW registered');
-   } catch (err) {
-     console.warn('SW failed', err);
-   }
- })();
-
- // Keep UI responsive when offline
- window.addEventListener('offline', () => console.log('offline'));
- window.addEventListener('online', () => console.log('online'));
-
- // Accessibility: close modals on Esc (Προσθήκη Menu Modal)
- window.addEventListener('keydown', (e) => {
-   if (e.key === 'Escape') {
-     document.querySelectorAll('[id$="Modal"]').forEach(m => m.classList.add('hidden'));
-     itemModal.classList.add('hidden');
-     detailModal.classList.add('hidden');
-     listModal.classList.add('hidden');
-     imageModal.classList.add('hidden');
-     menuModal.classList.add('hidden'); // Νέο: Κλείσιμο Menu Modal
-   }
- });
-
- </script>
-
- </body>
+<body class="min-h-screen antialiased">
+
+    <!-- Service Worker Script (sw.js) - Ενσωματωμένο -->
+    <script id="sw-script" type="text/javascript">
+        // ... existing service worker script (sw.js) ...
+        // Αυτό το script εξυπηρετεί το sw.js
+        const swContent = `
+            const CACHE_NAME = 'shopping-list-cache-v1';
+            const urlsToCache = [
+                '/',
+                'index.html',
+                'https://cdn.tailwindcss.com',
+                'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap'
+            ];
+
+            self.addEventListener('install', event => {
+                // Ανοίγει την cache και προσθέτει τα βασικά αρχεία
+                event.waitUntil(
+                    caches.open(CACHE_NAME)
+                        .then(cache => {
+                            console.log('Opened cache');
+                            return cache.addAll(urlsToCache).catch(err => {
+                                console.error('Failed to cache resources:', err);
+                            });
+                        })
+                );
+                // Διασφαλίζει ότι ο νέος SW αναλαμβάνει αμέσως
+                self.skipWaiting();
+            });
+
+            self.addEventListener('fetch', event => {
+                // Προσπαθεί να τραβήξει από το δίκτυο, αν αποτύχει, τραβάει από την cache
+                event.respondWith(
+                    caches.match(event.request)
+                        .then(response => {
+                            // Cache hit - επιστρέφει την απάντηση
+                            if (response) {
+                                return response;
+                            }
+                            // Cache miss - πηγαίνει στο δίκτυο
+                            return fetch(event.request);
+                        }
+                    )
+                );
+            });
+
+            self.addEventListener('activate', event => {
+                const cacheWhitelist = [CACHE_NAME];
+                event.waitUntil(
+                    caches.keys().then(cacheNames => {
+                        return Promise.all(
+                            cacheNames.map(cacheName => {
+                                if (cacheWhitelist.indexOf(cacheName) === -1) {
+                                    // Διαγράφει παλιές caches
+                                    return caches.delete(cacheName);
+                                }
+                            })
+                        );
+                    })
+                );
+                // Διεκδικεί όλους τους πελάτες για να διασφαλίσει ότι όλα είναι υπό τον έλεγχο του SW
+                return self.clients.claim();
+            });
+        `;
+
+        function createServiceWorkerBlob() {
+            const blob = new Blob([swContent], { type: 'application/javascript' });
+            return URL.createObjectURL(blob);
+        }
+
+        // Αντικατάσταση του path του SW με το Blob URL για να λειτουργήσει στο ενιαίο αρχείο
+        document.addEventListener('DOMContentLoaded', () => {
+            if ('serviceWorker' in navigator) {
+                const originalRegister = navigator.serviceWorker.register;
+                navigator.serviceWorker.register = (url, options) => {
+                    if (url === '/sw.js') {
+                        // Αντικαθιστούμε το /sw.js με το Blob URL
+                        return originalRegister.call(navigator.serviceWorker, createServiceWorkerBlob(), options);
+                    }
+                    return originalRegister.call(navigator.serviceWorker, url, options);
+                };
+            }
+        });
+    </script>
+    <!-- Τέλος Service Worker Script -->
+
+    <div class="max-w-md mx-auto p-4 sm:p-6 bg-white shadow-xl min-h-screen pb-24">
+
+        <!-- Επικεφαλίδα -->
+        <header class="text-center mb-4">
+            <h1 class="text-3xl font-extrabold text-teal-700">🛒 Η Κοινή Λίστα σας</h1>
+            <p id="user-info" class="text-sm text-gray-500 mt-1"></p>
+        </header>
+        
+        <!-- Controls: List Filter & Management -->
+        <div class="flex flex-col gap-3 mb-4">
+            <!-- Νέο container για φίλτρα λίστας -->
+            <div class="border-b pb-3">
+                 <label class="block text-sm font-medium text-gray-700 mb-2">Φιλτράρισμα Λίστας:</label>
+                <div id="list-filter-container" class="flex flex-wrap gap-2">
+                    <!-- Τα φίλτρα (chips) θα μπουν εδώ από JS -->
+                </div>
+            </div>
+            
+            <button id="manage-lists-btn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold p-3 rounded-lg transition duration-200" title="Διαχείριση Λιστών">
+                Διαχείριση Λιστών
+            </button>
+        </div>
+
+
+        <!-- Λίστα Αγορών -->
+        <div class="flex justify-between items-center mb-3 border-b pb-2">
+            <h2 class="text-xl font-bold text-teal-800">Αντικείμενα προς Αγορά:</h2>
+            <button id="delete-checked-btn" class="flex-shrink-0 bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold py-1 px-2 rounded-lg transition duration-200" title="Διαγραφή Όσων Ελέγχθηκαν">
+                Διαγραφή (Checked)
+            </button>
+        </div>
+        <div id="shopping-list" class="space-y-3">
+            <!-- Εδώ θα φορτωθούν τα αντικείμενα -->
+            <p id="loading-msg" class="text-center text-gray-500 italic">Φόρτωση λίστας...</p>
+        </div>
+
+    </div>
+    
+    <!-- Floating Action Button (FAB) -->
+    <button id="add-item-fab" class="fixed bottom-6 right-6 bg-teal-600 hover:bg-teal-700 text-white font-bold w-14 h-14 rounded-full shadow-lg flex items-center justify-center transform hover:scale-105 transition duration-200">
+        <!-- SVG για + -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+    </button>
+    
+    <!-- Modal Προσθήκης/Επεξεργασίας Προϊόντος -->
+    <div id="item-modal" class="modal fixed inset-0 z-30 bg-black bg-opacity-50 flex items-center justify-center p-4 invisible opacity-0">
+        <div class="modal-content bg-white w-full max-w-md p-6 rounded-xl shadow-2xl transform scale-95">
+            <h2 id="item-modal-title" class="text-2xl font-bold text-gray-800 mb-4">Νέο Προϊόν</h2>
+            <form id="item-form">
+                <input type="hidden" id="item-id">
+                
+                <div class="mb-4">
+                    <label for="item-name" class="block text-sm font-medium text-gray-700 mb-1">Όνομα Προϊόντος</label>
+                    <input type="text" id="item-name" class="w-full p-3 border-2 border-gray-300 rounded-lg" required>
+                </div>
+                
+                <div class="flex gap-4 mb-4">
+                    <div class="flex-grow">
+                        <label for="item-quantity" class="block text-sm font-medium text-gray-700 mb-1">Ποσότητα (π.χ. 1L)</label>
+                        <input type="text" id="item-quantity" class="w-full p-3 border-2 border-gray-300 rounded-lg">
+                    </div>
+                    <div class="flex-grow">
+                        <label for="item-priority" class="block text-sm font-medium text-gray-700 mb-1">Προτεραιότητα</label>
+                        <select id="item-priority" class="w-full p-3 border-2 border-gray-300 rounded-lg bg-white">
+                            <option value="medium">Επείγον</option>
+                            <option value="high">Πολύ Επείγον</option>
+                            <option value="low">Μόλις Μπορέσω</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="item-description" class="block text-sm font-medium text-gray-700 mb-1">Περιγραφή/Σημειώσεις</label>
+                    <textarea id="item-description" rows="2" class="w-full p-3 border-2 border-gray-300 rounded-lg"></textarea>
+                </div>
+
+                <div class="mb-6">
+                    <label for="item-list" class="block text-sm font-medium text-gray-700 mb-1">Λίστα</label>
+                    <select id="item-list" class="w-full p-3 border-2 border-gray-300 rounded-lg bg-white" required>
+                        <!-- Επιλογές λίστας θα φορτωθούν εδώ -->
+                    </select>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-item-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-5 rounded-xl transition duration-200">Ακύρωση</button>
+                    <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-5 rounded-xl transition duration-200">Αποθήκευση</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Διαχείρισης Λιστών -->
+    <div id="list-modal" class="modal fixed inset-0 z-40 bg-black bg-opacity-50 flex items-center justify-center p-4 invisible opacity-0">
+        <div class="modal-content bg-white w-full max-w-md p-6 rounded-xl shadow-2xl transform scale-95">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Διαχείριση Λιστών</h2>
+            
+            <form id="list-form" class="flex gap-2 mb-4">
+                <input type="text" id="list-name-input" placeholder="Όνομα νέας λίστας" class="w-full p-3 border-2 border-gray-300 rounded-lg" required>
+                <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200">Προσθήκη</button>
+            </form>
+
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Υπάρχουσες Λίστες:</h3>
+            <div id="list-management-container" class="space-y-2 max-h-60 overflow-y-auto">
+                <!-- Οι λίστες για διαχείριση θα μπουν εδώ -->
+            </div>
+            
+            <div class="flex justify-end mt-6">
+                <button type="button" id="close-list-modal-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-5 rounded-xl transition duration-200">Κλείσιμο</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDK και Λογική Εφαρμογής -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, setDoc, setLogLevel, query, orderBy, serverTimestamp, updateDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ... existing firebase setup ...
+        setLogLevel('Debug');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+        
+        // Νέα global state
+        let allLists = [];
+        let allItems = [];
+        // let currentListFilter = "all"; // Πλέον δεν χρησιμοποιείται
+        let activeListFilters = ['all']; // Νέο state
+        let itemListenerUnsubscribe = null;
+        let listListenerUnsubscribe = null;
+
+        // UI Elements
+        const shoppingListElement = document.getElementById('shopping-list');
+        const loadingMsg = document.getElementById('loading-msg');
+        const userInfo = document.getElementById('user-info');
+        // const listSelector = document.getElementById('list-selector'); // ΔΙΑΓΡΑΦΗΚΕ
+        const listFilterContainer = document.getElementById('list-filter-container'); // ΝΕΟ
+        const deleteCheckedBtn = document.getElementById('delete-checked-btn'); // ΝΕΟ
+        const manageListsBtn = document.getElementById('manage-lists-btn');
+        
+        // FAB
+        const addItemFab = document.getElementById('add-item-fab');
+        
+        // Item Modal
+        const itemModal = document.getElementById('item-modal');
+        const itemModalTitle = document.getElementById('item-modal-title');
+        const itemForm = document.getElementById('item-form');
+        const cancelItemBtn = document.getElementById('cancel-item-btn');
+        const itemIdInput = document.getElementById('item-id');
+        const itemNameInput = document.getElementById('item-name');
+        const itemQuantityInput = document.getElementById('item-quantity');
+        const itemPriorityInput = document.getElementById('item-priority');
+        const itemDescriptionInput = document.getElementById('item-description');
+        const itemListSelect = document.getElementById('item-list');
+        
+        // List Modal
+        const listModal = document.getElementById('list-modal');
+        const listForm = document.getElementById('list-form');
+        const listNameInput = document.getElementById('list-name-input');
+        const listManagementContainer = document.getElementById('list-management-container');
+        const closeListModalBtn = document.getElementById('close-list-modal-btn');
+
+
+        // 1. Εκκίνηση Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            console.log("Firebase initialized.");
+        } catch (error) {
+            console.error("Error initializing Firebase:", error);
+            shoppingListElement.innerHTML = `<p class="text-red-500 text-center">Σφάλμα: Αδύνατη η σύνδεση με τη βάση δεδομένων.</p>`;
+        }
+
+
+        // 2. Έλεγχος Αυθεντικοποίησης
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                const shortUserId = userId.substring(0, 8);
+                userInfo.textContent = `Συνδεδεμένος Χρήστης ID: ${shortUserId}...`;
+                isAuthReady = true;
+                console.log("Authenticated User ID:", userId);
+                // Ξεκινάμε την ακρόαση
+                listenToLists();
+                listenToItems();
+            } else {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Signed in with custom token.");
+                    } else {
+                        const result = await signInAnonymously(auth);
+                        userId = result.user.uid;
+                        userInfo.textContent = `Ανώνυμος Χρήστης ID: ${userId.substring(0, 8)}...`;
+                        isAuthReady = true;
+                        console.log("Signed in anonymously. New User ID:", userId);
+                        listenToLists();
+                        listenToItems();
+                    }
+                } catch (error) {
+                    console.error("Authentication failed:", error);
+                    loadingMsg.textContent = "Σφάλμα Αυθεντικοποίησης.";
+                }
+            }
+        });
+
+
+        // 3. Firestore Paths
+        function getListCollectionPath() {
+            return `artifacts/${appId}/public/data/lists`;
+        }
+        function getItemCollectionPath() {
+            return `artifacts/${appId}/public/data/items`;
+        }
+
+        // 4. Real-time Listeners
+        function listenToLists() {
+            if (listListenerUnsubscribe) listListenerUnsubscribe();
+            
+            const q = query(collection(db, getListCollectionPath()), orderBy('name'));
+            listListenerUnsubscribe = onSnapshot(q, (snapshot) => {
+                allLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log("Lists updated:", allLists);
+                populateListDropdowns(); // Αυτό γεμίζει το modal dropdown
+                populateListFilters(); // ΝΕΟ: Γεμίζει τα chips
+                populateListManagementUI();
+                renderItems(); // Re-render items in case list name changed
+            }, (error) => {
+                console.error("Error listening to lists:", error);
+            });
+        }
+        
+        function listenToItems() {
+            if (itemListenerUnsubscribe) itemListenerUnsubscribe();
+
+            const q = query(collection(db, getItemCollectionPath()), orderBy('timestamp', 'desc'));
+            itemListenerUnsubscribe = onSnapshot(q, (snapshot) => {
+                allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log("Items updated:", allItems);
+                renderItems();
+            }, (error) => {
+                console.error("Error listening to items:", error);
+                loadingMsg.textContent = "Σφάλμα φόρτωσης προϊόντων.";
+            });
+        }
+
+        // 5. Render Functions
+        function renderItems() {
+            loadingMsg.style.display = 'none';
+            shoppingListElement.innerHTML = '';
+
+            // 1. Filter
+            const filteredItems = allItems.filter(item => {
+                // Αν το 'all' είναι ενεργό, δείξε τα όλα
+                if (activeListFilters.includes('all')) return true;
+                // Αλλιώς, δείξε μόνο αν το listId του item είναι μέσα στα ενεργά φίλτρα
+                return activeListFilters.includes(item.listId);
+            });
+
+            // 2. Sort (by priority AND completed status)
+            const priorityOrder = { high: 1, medium: 2, low: 3 };
+            const sortedItems = filteredItems.sort((a, b) => {
+                // Checkbox sort: Unchecked items (false) come first
+                if (a.completed !== b.completed) {
+                    return a.completed ? 1 : -1; // (false < true)
+                }
+
+                // Priority sort
+                const priorityA = priorityOrder[a.priority] || 99;
+                const priorityB = priorityOrder[b.priority] || 99;
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB;
+                }
+                
+                // Fallback to timestamp (newest first)
+                return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
+            });
+
+            if (sortedItems.length === 0) {
+                shoppingListElement.innerHTML = `<p class="text-center text-gray-500 mt-4 p-4 bg-gray-50 rounded-xl">Η λίστα είναι άδεια!</p>`;
+                return;
+            }
+
+            sortedItems.forEach(item => {
+                const itemElement = createListItem(item);
+                shoppingListElement.appendChild(itemElement);
+            });
+        }
+
+        function createListItem(item) {
+            const element = document.createElement('div');
+            // Προσθήκη 'opacity-60' αν είναι checked
+            const checkedClass = item.completed ? 'opacity-60' : '';
+            element.className = `list-item flex items-center bg-white p-3 pr-2 rounded-xl shadow transition duration-150 hover:shadow-lg ${checkedClass}`;
+            
+            let priorityClass = '';
+            if (item.priority === 'high') priorityClass = 'priority-high';
+            else if (item.priority === 'medium') priorityClass = 'priority-medium';
+            else if (item.priority === 'low') priorityClass = 'priority-low';
+
+            const list = allLists.find(l => l.id === item.listId);
+            const listName = list ? list.name : 'Άγνωστη Λίστα';
+            
+            // Νέα κλάση για strikethrough
+            const textClass = item.completed ? 'line-through text-gray-500' : 'text-gray-800';
+
+            element.innerHTML = `
+                <!-- Νέο Checkbox -->
+                <input type="checkbox" data-id="${item.id}" class="item-checkbox flex-shrink-0 h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500 mr-3" ${item.completed ? 'checked' : ''}>
+                
+                <div class="priority-dot mr-3 ${priorityClass}"></div>
+                <div class="flex-grow min-w-0"> <!-- Προσθήκη min-w-0 για σωστό word-break -->
+                    <span class="text-lg font-medium ${textClass} break-words">${item.name}</span>
+                    <div class="text-sm ${textClass} truncate">
+                        ${item.quantity ? `<span class="font-semibold">${item.quantity}</span> | ` : ''}
+                        ${(activeListFilters.includes('all') || activeListFilters.length > 1) ? `<span>${listName}</span>` : ''}
+                    </div>
+                    ${item.description ? `<p class="text-sm ${textClass} mt-1 break-words">${item.description}</p>` : ''}
+                </div>
+                <button data-id="${item.id}" class="edit-btn flex-shrink-0 text-gray-400 hover:text-blue-500 p-2 rounded-full transition duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button data-id="${item.id}" class="purchase-btn flex-shrink-0 bg-green-500 hover:bg-green-600 text-white p-2 rounded-full shadow-md text-sm leading-none flex items-center justify-center ml-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            `;
+
+            element.querySelector('.purchase-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteItem(item.id);
+            });
+            
+            element.querySelector('.edit-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openItemModal(item);
+            });
+
+            // Νέος listener για το checkbox
+            element.querySelector('.item-checkbox').addEventListener('click', (e) => {
+                // e.stopPropagation(); // Δεν χρειάζεται, αφήνει το event να πάει
+                const docId = e.target.dataset.id;
+                const isChecked = e.target.checked;
+                updateItemCheckedStatus(docId, isChecked);
+            });
+
+            return element;
+        }
+
+        function populateListDropdowns() {
+            // const currentMainVal = listSelector.value; // ΔΙΑΓΡΑΦΗΚΕ
+            const currentItemVal = itemListSelect.value;
+            
+            // listSelector.innerHTML = '<option value="all">Όλες οι Λίστες</option>'; // ΔΙΑΓΡΑΦΗΚΕ
+            itemListSelect.innerHTML = '';
+            
+            if(allLists.length === 0) {
+                itemListSelect.innerHTML = '<option value="">Δημιουργήστε μια λίστα πρώτα</option>';
+            }
+
+            allLists.forEach(list => {
+                // listSelector.innerHTML += `<option value="${list.id}">${list.name}</option>`; // ΔΙΑΓΡΑΦΗΚΕ
+                itemListSelect.innerHTML += `<option value="${list.id}">${list.name}</option>`;
+            });
+            
+            // listSelector.value = allLists.some(l => l.id === currentMainVal) ? currentMainVal : 'all'; // ΔΙΑΓΡΑΦΗΚΕ
+            itemListSelect.value = allLists.some(l => l.id === currentItemVal) ? currentItemVal : (allLists[0]?.id || '');
+        }
+        
+        // ΝΕΑ ΣΥΝΑΡΤΗΣΗ: populateListFilters (για τα chips)
+        function populateListFilters() {
+            listFilterContainer.innerHTML = '';
+            
+            // 1. Add "All" chip
+            const allChip = createFilterChip('all', 'Όλες');
+            listFilterContainer.appendChild(allChip);
+
+            // 2. Add chips for each list
+            allLists.forEach(list => {
+                const listChip = createFilterChip(list.id, list.name);
+                listFilterContainer.appendChild(listChip);
+            });
+        }
+        
+        // ΝΕΑ ΣΥΝΑΡΤΗΣΗ: createFilterChip
+        function createFilterChip(listId, name) {
+            const chip = document.createElement('button');
+            chip.className = 'list-filter-chip border border-gray-300 text-gray-700 text-sm font-medium py-1 px-3 rounded-full';
+            chip.textContent = name;
+            chip.dataset.id = listId;
+            
+            if (activeListFilters.includes(listId)) {
+                chip.classList.add('active');
+            }
+            
+            chip.addEventListener('click', () => {
+                const id = chip.dataset.id;
+                
+                // Logic for "All" vs. specific lists
+                if (id === 'all') {
+                    // Αν πατήθηκε το "Όλες", γίνεται το μόνο ενεργό
+                    activeListFilters = ['all'];
+                } else {
+                    // Αφαίρεση του "Όλες" αν υπήρχε
+                    if (activeListFilters.includes('all')) {
+                        activeListFilters = [];
+                    }
+                    
+                    // Handle multi-select
+                    const index = activeListFilters.indexOf(id);
+                    if (index > -1) {
+                        // Ηταν ενεργό, το αφαιρούμε
+                        activeListFilters.splice(index, 1);
+                    } else {
+                        // Δεν ήταν ενεργό, το προσθέτουμε
+                        activeListFilters.push(id);
+                    }
+                    
+                    // Αν μείνει κενό, επιστρέφουμε στο "Όλες"
+                    if (activeListFilters.length === 0) {
+                        activeListFilters = ['all'];
+                    }
+                }
+                
+                // Update UI (chips)
+                Array.from(listFilterContainer.children).forEach(c => {
+                    c.classList.toggle('active', activeListFilters.includes(c.dataset.id));
+                });
+                
+                // Re-render the item list
+                renderItems();
+            });
+            return chip;
+        }
+
+        function populateListManagementUI() {
+            listManagementContainer.innerHTML = '';
+            if (allLists.length === 0) {
+                 listManagementContainer.innerHTML = '<p class="text-gray-500 italic">Δεν υπάρχουν λίστες.</p>';
+                 return;
+            }
+            
+            allLists.forEach(list => {
+                const el = document.createElement('div');
+                el.className = 'flex items-center justify-between p-2 bg-gray-50 rounded-lg';
+                el.innerHTML = `
+                    <input type="text" value="${list.name}" data-id="${list.id}" class="list-name-edit-input flex-grow bg-transparent font-medium text-gray-700 p-1 rounded border border-transparent focus:border-teal-500 focus:bg-white">
+                `;
+                // TODO: Add delete button
+                listManagementContainer.appendChild(el);
+            });
+            
+            listManagementContainer.querySelectorAll('.list-name-edit-input').forEach(input => {
+                input.addEventListener('change', async (e) => {
+                    const newName = e.target.value.trim();
+                    const listId = e.target.dataset.id;
+                    if (newName && listId) {
+                        try {
+                            await updateDoc(doc(db, getListCollectionPath(), listId), { name: newName });
+                            alertMessage("Η λίστα ενημερώθηκε!", "success");
+                        } catch (err) {
+                            console.error("Error updating list name:", err);
+                            alertMessage("Αποτυχία ενημέρωσης.", "error");
+                        }
+                    }
+                });
+            });
+        }
+
+
+        // 6. CRUD Functions
+        async function handleItemFormSubmit(e) {
+            e.preventDefault();
+            if (!isAuthReady) return;
+
+            const itemId = itemIdInput.value;
+            const itemData = {
+                name: itemNameInput.value.trim(),
+                quantity: itemQuantityInput.value.trim(),
+                priority: itemPriorityInput.value,
+                description: itemDescriptionInput.value.trim(),
+                listId: itemListSelect.value,
+                updatedBy: userId,
+            };
+
+            if (itemData.name === "" || itemData.listId === "") {
+                alertMessage("Το Όνομα και η Λίστα είναι υποχρεωτικά.", "error");
+                return;
+            }
+
+            try {
+                if (itemId) {
+                    // Update
+                    await updateDoc(doc(db, getItemCollectionPath(), itemId), itemData);
+                    alertMessage("Το προϊόν ενημερώθηκε!", "success");
+                } else {
+                    // Add New
+                    itemData.addedBy = userId;
+                    itemData.timestamp = serverTimestamp();
+                    itemData.completed = false; // ΝΕΟ: Set default completed status
+                    await addDoc(collection(db, getItemCollectionPath()), itemData);
+                    alertMessage("Το προϊόν προστέθηκε!", "success");
+                }
+                closeItemModal();
+            } catch (err) {
+                console.error("Error saving item:", err);
+                alertMessage("Αποτυχία αποθήκευσης.", "error");
+            }
+        }
+        
+        // ΝΕΑ ΣΥΝΑΡΤΗΣΗ
+        async function updateItemCheckedStatus(docId, isChecked) {
+            if (!isAuthReady) return;
+            try {
+                await updateDoc(doc(db, getItemCollectionPath(), docId), {
+                    completed: isChecked,
+                    updatedBy: userId
+                });
+                // No alert needed, UI will update via onSnapshot (και το re-render)
+                console.log(`Item ${docId} checked status set to ${isChecked}`);
+            } catch (e) {
+                console.error("Error updating checked status:", e);
+                alertMessage("Αποτυχία ενημέρωσης.", "error");
+            }
+        }
+        
+        async function deleteItem(docId) {
+            if (!isAuthReady) return;
+            try {
+                await deleteDoc(doc(db, getItemCollectionPath(), docId));
+                alertMessage("Το αντικείμενο αφαιρέθηκε (αγοράστηκε)!", "success");
+            } catch (e) {
+                console.error("Error removing document: ", e);
+                alertMessage("Αποτυχία διαγραφής.", "error");
+            }
+        }
+        
+        // ΝΕΑ ΣΥΝΑΡΤΗΣΗ
+        async function deleteCheckedItems() {
+            if (!isAuthReady) return;
+            
+            const itemsToDelete = allItems.filter(item => item.completed === true);
+            if (itemsToDelete.length === 0) {
+                alertMessage("Δεν υπάρχουν τσεκαρισμένα αντικείμενα για διαγραφή.", "info");
+                return;
+            }
+            
+            // !! ΣΗΜΑΝΤΙΚΟ: Χωρίς confirmation modal (όπως το alert), 
+            // αυτό είναι επικίνδυνο. Προς το παρόν, διαγράφει κατευθείαν.
+            console.log(`Deleting ${itemsToDelete.length} items...`);
+            
+            // Χρησιμοποιούμε Promise.all για να τρέξουν παράλληλα οι διαγραφές
+            const deletePromises = itemsToDelete.map(item => {
+                return deleteDoc(doc(db, getItemCollectionPath(), item.id));
+            });
+            
+            try {
+                await Promise.all(deletePromises);
+                alertMessage(`Διαγράφηκαν ${itemsToDelete.length} αντικείμενα!`, "success");
+            } catch (e) {
+                console.error("Error deleting checked items:", e);
+                alertMessage("Παρουσιάστηκε σφάλμα κατά τη διαγραφή.", "error");
+            }
+        }
+        
+        async function handleListFormSubmit(e) {
+            e.preventDefault();
+            const newName = listNameInput.value.trim();
+            if (newName) {
+                try {
+                    await addDoc(collection(db, getListCollectionPath()), {
+                        name: newName,
+                        createdBy: userId,
+                        timestamp: serverTimestamp()
+                    });
+                    listNameInput.value = '';
+                    alertMessage("Η λίστα προστέθηκε!", "success");
+                } catch (err) {
+                    console.error("Error adding list:", err);
+                    alertMessage("Αποτυχία προσθήκης λίστας.", "error");
+                }
+            }
+        }
+
+        // 7. Modal Controls
+        function openItemModal(item = null) {
+            itemForm.reset();
+            if (item) {
+                // Edit Mode
+                itemModalTitle.textContent = "Επεξεργασία Προϊόντος";
+                itemIdInput.value = item.id;
+                itemNameInput.value = item.name;
+                itemQuantityInput.value = item.quantity || '';
+                itemPriorityInput.value = item.priority || 'medium';
+                itemDescriptionInput.value = item.description || '';
+                itemListSelect.value = item.listId;
+            } else {
+                // Add Mode
+                itemModalTitle.textContent = "Νέο Προϊόν";
+                itemIdInput.value = '';
+                // Set default list based on filter
+                // Αν είναι επιλεγμένη μόνο μία λίστα, βάλε την ως default
+                if (activeListFilters.length === 1 && activeListFilters[0] !== 'all') {
+                    itemListSelect.value = activeListFilters[0];
+                } else {
+                    // Αλλιώς, βάλε την πρώτη διαθέσιμη λίστα
+                    itemListSelect.value = (allLists[0]?.id || '');
+                }
+            }
+            itemModal.classList.remove('invisible', 'opacity-0');
+            itemModal.querySelector('.modal-content').classList.remove('scale-95');
+        }
+
+        function closeItemModal() {
+            itemModal.classList.add('opacity-0');
+            itemModal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => itemModal.classList.add('invisible'), 200);
+        }
+        
+        function openListModal() {
+            listModal.classList.remove('invisible', 'opacity-0');
+            listModal.querySelector('.modal-content').classList.remove('scale-95');
+        }
+
+        function closeListModal() {
+            listModal.classList.add('opacity-0');
+            listModal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => listModal.classList.add('invisible'), 200);
+        }
+        
+        // 8. Χειρισμός Ειδοποιήσεων (αντί για alert)
+        function alertMessage(message, type = 'info') {
+            // ... (same alertMessage function as before) ...
+            const container = document.getElementById('shopping-list');
+            const alertBox = document.createElement('div');
+            const baseClasses = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-lg shadow-xl z-50 text-white font-semibold transition-all duration-300';
+            
+            let typeClasses;
+            if (type === 'success') {
+                typeClasses = 'bg-green-500';
+            } else if (type === 'error') {
+                typeClasses = 'bg-red-500';
+            } else {
+                typeClasses = 'bg-blue-500';
+            }
+
+            alertBox.className = `${baseClasses} ${typeClasses} opacity-0 scale-95`;
+            alertBox.textContent = message;
+            document.body.appendChild(alertBox);
+
+            // Εμφάνιση
+            setTimeout(() => {
+                alertBox.classList.remove('opacity-0', 'scale-95');
+            }, 50);
+
+            // Απόκρυψη
+            setTimeout(() => {
+                alertBox.classList.add('opacity-0', 'scale-95');
+                alertBox.addEventListener('transitionend', () => alertBox.remove());
+            }, 3000);
+        }
+
+        // 9. Event Listeners
+        /* ΔΙΑΓΡΑΦΗΚΕ
+        listSelector.addEventListener('change', () => {
+            currentListFilter = listSelector.value;
+            renderItems();
+        });
+        */
+        
+        // ΝΕΟ
+        deleteCheckedBtn.addEventListener('click', deleteCheckedItems);
+        
+        addItemFab.addEventListener('click', () => openItemModal(null));
+        itemForm.addEventListener('submit', handleItemFormSubmit);
+        cancelItemBtn.addEventListener('click', closeItemModal);
+        
+        manageListsBtn.addEventListener('click', openListModal);
+        listForm.addEventListener('submit', handleListFormSubmit);
+        closeListModalBtn.addEventListener('click', closeListModal);
+
+    </script>
+</body>
 </html>
+
+
