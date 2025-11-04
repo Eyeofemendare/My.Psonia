@@ -7,7 +7,9 @@
     <!-- Tailwind CSS CDN για styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        // ΝΕΟ: Configuration για Dark Mode
         tailwind.config = {
+            darkMode: 'class', // Ενεργοποίηση Dark Mode μέσω class
             theme: {
                 extend: {
                     colors: {
@@ -25,10 +27,16 @@
     <!-- Ρυθμίσεις PWA: Manifest και Service Worker -->
     <link rel="manifest" href="/manifest.json">
     <script>
-        // FIX 1: Utility function to convert UTF-8 string to Base64 safe string
+        // Utility function to convert UTF-8 string to Base64 safe string (για ελληνικούς χαρακτήρες)
         function utf8ToBase64(str) {
-            // Encode the string as URI component to handle UTF-8, then convert to Latin-1 safe characters for btoa
             return btoa(unescape(encodeURIComponent(str)));
+        }
+
+        // Εφαρμογή Dark/Light Mode από το localStorage
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
         }
 
         // Δημιουργία απλού manifest.json δυναμικά για PWA
@@ -41,115 +49,189 @@
             "background_color": "#0D9488",
             "theme_color": "#0D9488",
             "icons": [
-                {
-                    "src": "https://placehold.co/192x192/10b981/ffffff?text=Ψ",
-                    "sizes": "192x192",
-                    "type": "image/png"
-                },
-                {
-                    "src": "https://placehold.co/512x512/10b981/ffffff?text=Ψ",
-                    "sizes": "512x512",
-                    "type": "image/png"
-                }
+                { "src": "https://placehold.co/192x192/10b981/ffffff?text=Ψ", "sizes": "192x192", "type": "image/png" },
+                { "src": "https://placehold.co/512x512/10b981/ffffff?text=Ψ", "sizes": "512x512", "type": "image/png" }
             ]
         };
 
-        // Χρησιμοποιούμε τη νέα συνάρτηση για την ασφαλή κωδικοποίηση Base64
         const manifestUrl = 'data:application/json;base64,' + utf8ToBase64(JSON.stringify(manifest));
         const link = document.createElement('link');
         link.rel = 'manifest';
         link.href = manifestUrl;
         document.head.appendChild(link);
 
-        // Service Worker (Διατήρηση για PWA, αν και δεν είναι απαραίτητο για το Canvas)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/service-worker.js').then(registration => {
-                    console.log('SW registered: ', registration);
+                    // console.log('SW registered: ', registration);
                 }).catch(registrationError => {
-                    console.log('SW registration failed: ', registrationError);
+                    // console.log('SW registration failed: ', registrationError);
                 });
             });
         }
     </script>
+    <style>
+        /* Custom styles for dark mode input */
+        .dark input, .dark textarea, .dark select {
+            background-color: #374151; /* gray-700 */
+            color: #F3F4F6; /* gray-100 */
+            border-color: #4B5563; /* gray-600 */
+        }
+        .dark input:focus, .dark textarea:focus, .dark select:focus {
+             border-color: #0D9488;
+             box-shadow: 0 0 0 1px #0D9488;
+        }
+        .dark .bg-white { background-color: #1F2937; } /* gray-800 */
+        .dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .dark .text-gray-500 { color: #9CA3AF; } /* gray-400 */
+        .dark .text-gray-700 { color: #D1D5DB; } /* gray-300 */
+        .dark .text-gray-400 { color: #6B7280; } /* gray-500 */
+        .dark .bg-gray-50 { background-color: #111827; } /* gray-900 */
+        
+        /* Custom scrollbar for better aesthetics */
+        .max-h-60::-webkit-scrollbar { width: 8px; }
+        .max-h-60::-webkit-scrollbar-thumb { background-color: #9CA3AF; border-radius: 10px; }
+        .dark .max-h-60::-webkit-scrollbar-thumb { background-color: #4B5563; }
+        
+        /* Styles for multi-select (lists) - Ensure clear selection indication */
+        #item-list-ids-select option { padding: 8px; }
+        /* Style for selected options */
+        #item-list-ids-select option:checked { 
+            background-color: #0D9488; 
+            color: white; 
+            font-weight: 600;
+        }
+
+        /* Priority colors */
+        .priority-urgent { background-color: #FEE2E2; color: #DC2626; border-color: #F87171; } /* Red */
+        .priority-medium { background-color: #FEF3C7; color: #F59E0B; border-color: #FBBF24; } /* Amber */
+        .priority-low { background-color: #D1FAE5; color: #059669; border-color: #34D399; } /* Green */
+        .dark .priority-urgent { background-color: #450A0A; color: #FCA5A5; border-color: #DC2626; }
+        .dark .priority-medium { background-color: #422006; color: #FCD34D; border-color: #F59E0B; }
+        .dark .priority-low { background-color: #064E3B; color: #A7F3D0; border-color: #059669; }
+
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans antialiased">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans antialiased text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
     <!-- Κεντρικό Περιεχόμενο -->
     <div id="app" class="max-w-4xl mx-auto p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-extrabold text-primary-600 tracking-tight">Συνεργατική Λίστα Αγορών</h1>
-            <p id="auth-status" class="text-sm text-gray-500 mt-1"></p>
+            <h1 class="text-4xl font-extrabold text-primary-600 dark:text-primary-500 tracking-tight">Συνεργατική Λίστα Αγορών</h1>
+            <p id="auth-status" class="text-sm text-gray-500 dark:text-gray-400 mt-1"></p>
         </header>
 
-        <main class="bg-white p-6 rounded-xl shadow-2xl">
-            <!-- Φόρμα Προσθήκης Είδους (Κρυφή) -->
+        <main class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl transition-colors duration-300">
+            <!-- Φόρμα Προσθήκης Είδους (Modal) -->
             <div id="item-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-xl shadow-3xl p-6 w-full max-w-md transform transition-all scale-100 opacity-100">
-                    <h2 id="item-modal-title" class="text-2xl font-bold mb-4 text-primary-600">Προσθήκη Είδους</h2>
+                <div class="bg-white dark:bg-gray-700 rounded-xl shadow-3xl p-6 w-full max-w-md transform transition-all scale-100 opacity-100">
+                    <h2 id="item-modal-title" class="text-2xl font-bold mb-4 text-primary-600 dark:text-primary-500">Προσθήκη Είδους</h2>
                     <form id="item-form">
                         <input type="hidden" id="item-id-input">
                         
                         <div class="mb-4">
-                            <label for="item-name" class="block text-sm font-medium text-gray-700 mb-1">Όνομα Είδους</label>
+                            <label for="item-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Όνομα Είδους</label>
                             <input type="text" id="item-name" required 
-                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150"
+                                   class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150"
                                    placeholder="π.χ. Γάλα 2L, Ντομάτες">
                         </div>
                         
+                        <!-- ΕΝΗΜΕΡΩΜΕΝΟ: Multi-select Λίστας (Μπορεί να γίνει επιλογή πάνω από 1) -->
                         <div class="mb-4">
-                            <label for="item-list-id" class="block text-sm font-medium text-gray-700 mb-1">Λίστα</label>
-                            <select id="item-list-id" required 
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150">
+                            <label for="item-list-ids-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Λίστες (Επιλέξτε μία ή περισσότερες)</label>
+                            <select id="item-list-ids-select" multiple required size="3"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150">
                                 <!-- Οι επιλογές θα φορτωθούν εδώ -->
+                            </select>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Κρατήστε πατημένο το Ctrl/Cmd για πολλαπλή επιλογή.</p>
+                        </div>
+                        
+                        <!-- ΝΕΟ: Προτεραιότητα -->
+                        <div class="mb-4">
+                            <label for="item-priority" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Προτεραιότητα</label>
+                            <select id="item-priority" required
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150">
+                                <option value="low">Μόλις Μπορέσω</option>
+                                <option value="medium">Επείγον</option>
+                                <option value="urgent">Πολύ Επείγον</option>
                             </select>
                         </div>
 
-                        <div class="flex justify-end space-x-3 mt-6">
-                            <button type="button" id="cancel-item-btn" 
-                                    class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150 font-medium">
-                                Ακύρωση
+                        <!-- ΝΕΟ: Σημειώσεις -->
+                        <div class="mb-4">
+                            <label for="item-notes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Σημειώσεις (π.χ. χαμηλά λιπαρά)</label>
+                            <textarea id="item-notes" rows="2"
+                                      class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150"
+                                      placeholder="Πρόσθεσε λεπτομέρειες ή ποσότητα."></textarea>
+                        </div>
+
+                        <!-- ΕΝΗΜΕΡΩΜΕΝΟ: Προσθήκη κουμπιού Διαγραφής και μεταφορά Save/Cancel δεξιά -->
+                        <div class="flex justify-between mt-6">
+                            <button type="button" id="delete-item-btn" 
+                                    class="px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 transition duration-150 font-medium shadow-md hover:shadow-lg hidden">
+                                Διαγραφή Είδους
                             </button>
-                            <button type="submit" id="save-item-btn" 
-                                    class="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition duration-150 font-medium shadow-md hover:shadow-lg">
-                                Αποθήκευση
-                            </button>
+                            <div class="flex space-x-3 ml-auto">
+                                <button type="button" id="cancel-item-btn" 
+                                        class="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-500 transition duration-150 font-medium">
+                                    Ακύρωση
+                                </button>
+                                <button type="submit" id="save-item-btn" 
+                                        class="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition duration-150 font-medium shadow-md hover:shadow-lg">
+                                    Αποθήκευση
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
 
             <!-- Λίστες και Φίλτρα -->
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
+            <div class="flex justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0 relative">
                 <div class="flex items-center space-x-3 w-full md:w-auto">
-                    <!-- ΝΕΟ: Dropdown για φιλτράρισμα -->
-                    <label for="list-selector" class="text-sm font-medium text-gray-700 whitespace-nowrap">Δείτε τη λίστα:</label>
-                    <select id="list-selector" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm transition duration-150">
+                    <!-- Dropdown για φιλτράρισμα (παραμένει single select) -->
+                    <label for="list-selector" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Δείτε τη λίστα:</label>
+                    <select id="list-selector" class="w-full md:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm transition duration-150">
                         <option value="all">Όλες οι λίστες</option>
                         <!-- Οι επιλογές θα φορτωθούν εδώ -->
                     </select>
                 </div>
                 
-                <div class="flex space-x-2 w-full md:w-auto">
-                    <button id="delete-checked-btn" 
-                            class="flex-1 md:flex-none px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-150 text-sm font-medium shadow-md">
-                        Διαγραφή Επιλεγμένων
+                <!-- ΝΕΟ: Κουμπί Μενού -->
+                <div class="relative">
+                    <button id="menu-btn" 
+                            class="p-2 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150 shadow-md">
+                        <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
                     </button>
-                    <!-- ΝΕΟ: Gemini AI Feature Button -->
-                    <button id="generate-recipe-btn" 
-                            class="flex-1 md:flex-none px-4 py-2 bg-accent text-gray-900 rounded-lg hover:bg-amber-600 transition duration-150 text-sm font-medium shadow-md">
-                        ✨ Προτείνετε Συνταγή
-                    </button>
-                    <button id="manage-lists-btn" 
-                            class="flex-1 md:flex-none px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-150 text-sm font-medium shadow-md">
-                        Διαχείριση Λιστών
-                    </button>
+
+                    <!-- Dropdown Μενού -->
+                    <div id="menu-dropdown" class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-700 rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-20 hidden">
+                        <div class="py-1">
+                            <a href="#" id="manage-lists-action" class="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <svg class="w-5 h-5 mr-3 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                                Διαχείριση Λιστών
+                            </a>
+                            <a href="#" id="delete-checked-action" class="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <svg class="w-5 h-5 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                Διαγραφή Επιλεγμένων
+                            </a>
+                            <a href="#" id="generate-recipe-action" class="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <svg class="w-5 h-5 mr-3 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2m-6 4h.01"></path></svg>
+                                ✨ Προτείνετε Συνταγή
+                            </a>
+                            <div class="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                            <button id="toggle-theme-action" class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 text-left">
+                                <svg id="theme-icon" class="w-5 h-5 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                <span id="theme-text">Dark Mode</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Λίστα Ειδών -->
             <div id="items-container" class="space-y-3">
-                <p class="text-center text-gray-500 italic" id="empty-list-message">Προσθέστε είδη για να ξεκινήσετε...</p>
+                <p class="text-center text-gray-500 dark:text-gray-400 italic" id="empty-list-message">Προσθέστε είδη για να ξεκινήσετε...</p>
             </div>
 
         </main>
@@ -163,12 +245,12 @@
 
     <!-- Modal Διαχείρισης Λιστών -->
     <div id="list-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-3xl p-6 w-full max-w-lg transform transition-all scale-100 opacity-100">
-            <h2 class="text-2xl font-bold mb-4 text-primary-600">Διαχείριση Λιστών</h2>
+        <div class="bg-white dark:bg-gray-700 rounded-xl shadow-3xl p-6 w-full max-w-lg transform transition-all scale-100 opacity-100">
+            <h2 class="text-2xl font-bold mb-4 text-primary-600 dark:text-primary-500">Διαχείριση Λιστών</h2>
             
             <form id="list-form" class="mb-4 flex space-x-2">
                 <input type="text" id="list-name-input" required placeholder="Νέα Λίστα (π.χ. Κουζίνα)"
-                       class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150">
+                       class="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 transition duration-150">
                 <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 font-medium">
                     Προσθήκη
                 </button>
@@ -180,7 +262,7 @@
 
             <div class="flex justify-end mt-6">
                 <button type="button" id="close-list-modal-btn" 
-                        class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150 font-medium">
+                        class="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-500 transition duration-150 font-medium">
                     Κλείσιμο
                 </button>
             </div>
@@ -189,19 +271,19 @@
 
     <!-- Modal Προβολής Συνταγής -->
     <div id="recipe-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-3xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto transform transition-all scale-100 opacity-100">
-            <h2 class="text-2xl font-bold mb-2 text-primary-600" id="recipe-title"></h2>
-            <p class="text-sm text-gray-500 mb-4 italic" id="recipe-description"></p>
+        <div class="bg-white dark:bg-gray-700 rounded-xl shadow-3xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto transform transition-all scale-100 opacity-100">
+            <h2 class="text-2xl font-bold mb-2 text-primary-600 dark:text-primary-500" id="recipe-title"></h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 italic" id="recipe-description"></p>
             
-            <h3 class="text-xl font-semibold mt-4 mb-2 text-gray-700 border-b pb-1">Υλικά (Ingredients)</h3>
-            <ul id="recipe-ingredients" class="list-disc list-inside space-y-1 text-gray-600 pl-4"></ul>
+            <h3 class="text-xl font-semibold mt-4 mb-2 text-gray-700 dark:text-gray-300 border-b dark:border-gray-600 pb-1">Υλικά (Ingredients)</h3>
+            <ul id="recipe-ingredients" class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 pl-4"></ul>
             
-            <h3 class="text-xl font-semibold mt-6 mb-2 text-gray-700 border-b pb-1">Εκτέλεση (Instructions)</h3>
-            <ol id="recipe-instructions" class="list-decimal list-inside space-y-2 text-gray-700 pl-4"></ol>
+            <h3 class="text-xl font-semibold mt-6 mb-2 text-gray-700 dark:text-gray-300 border-b dark:border-gray-600 pb-1">Εκτέλεση (Instructions)</h3>
+            <ol id="recipe-instructions" class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300 pl-4"></ol>
 
             <div class="flex justify-end mt-6">
                 <button type="button" id="close-recipe-modal-btn" 
-                        class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150 font-medium">
+                        class="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-500 transition duration-150 font-medium">
                     Κλείσιμο
                 </button>
             </div>
@@ -213,8 +295,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // FIX 2: Αφαιρέθηκε η διπλή δήλωση του 'addDoc'
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, arrayRemove, arrayUnion, runTransaction, writeBatch, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, writeBatch, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 1. Βασικές Μεταβλητές & Αρχικοποίηση
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -240,26 +321,38 @@
         const listSelector = document.getElementById('list-selector');
 
         const addItemFab = document.getElementById('add-item-fab');
-        const deleteCheckedBtn = document.getElementById('delete-checked-btn');
-        const generateRecipeBtn = document.getElementById('generate-recipe-btn'); // ΝΕΟ
         
+        // ΝΕΟ: Menu Elements
+        const menuBtn = document.getElementById('menu-btn');
+        const menuDropdown = document.getElementById('menu-dropdown');
+        const manageListsAction = document.getElementById('manage-lists-action');
+        const deleteCheckedAction = document.getElementById('delete-checked-action');
+        const generateRecipeAction = document.getElementById('generate-recipe-action');
+        const toggleThemeAction = document.getElementById('toggle-theme-action');
+        const themeText = document.getElementById('theme-text');
+        const themeIcon = document.getElementById('theme-icon');
+        
+        // Item Modal Fields
         const itemModal = document.getElementById('item-modal');
         const itemForm = document.getElementById('item-form');
-        const itemListIdSelect = document.getElementById('item-list-id');
+        const itemListIdsSelect = document.getElementById('item-list-ids-select'); 
+        const itemPrioritySelect = document.getElementById('item-priority'); 
+        const itemNotesInput = document.getElementById('item-notes'); 
         const cancelItemBtn = document.getElementById('cancel-item-btn');
+        const deleteItemBtn = document.getElementById('delete-item-btn'); 
 
-        const manageListsBtn = document.getElementById('manage-lists-btn');
+        // Other Modals
         const listModal = document.getElementById('list-modal');
         const listForm = document.getElementById('list-form');
+        const listNameInput = document.getElementById('list-name-input');
         const listsDisplay = document.getElementById('lists-display');
         const closeListModalBtn = document.getElementById('close-list-modal-btn');
-        
-        const recipeModal = document.getElementById('recipe-modal'); // ΝΕΟ
-        const recipeTitle = document.getElementById('recipe-title'); // ΝΕΟ
-        const recipeDescription = document.getElementById('recipe-description'); // ΝΕΟ
-        const recipeIngredients = document.getElementById('recipe-ingredients'); // ΝΕΟ
-        const recipeInstructions = document.getElementById('recipe-instructions'); // ΝΕΟ
-        const closeRecipeModalBtn = document.getElementById('close-recipe-modal-btn'); // ΝΕΟ
+        const recipeModal = document.getElementById('recipe-modal');
+        const recipeTitle = document.getElementById('recipe-title');
+        const recipeDescription = document.getElementById('recipe-description');
+        const recipeIngredients = document.getElementById('recipe-ingredients');
+        const recipeInstructions = document.getElementById('recipe-instructions');
+        const closeRecipeModalBtn = document.getElementById('close-recipe-modal-btn');
         
         // 2. Custom Alert Function (Non-blocking)
         function showCustomAlert(message, type = 'info') {
@@ -296,7 +389,30 @@
             }, 3000);
         }
 
-        // 3. Χειρισμός API Call (με exponential backoff)
+        // 3. Λειτουργίες UI
+        // ΝΕΟ: Toggle Dark Mode
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeButton(isDark);
+        }
+
+        function updateThemeButton(isDark) {
+            if (isDark) {
+                themeText.textContent = 'Light Mode';
+                themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
+            } else {
+                themeText.textContent = 'Dark Mode';
+                themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>`;
+            }
+        }
+        
+        // ΝΕΟ: Toggle Menu Dropdown
+        function toggleMenuDropdown() {
+            menuDropdown.classList.toggle('hidden');
+        }
+
+        // 4. Χειρισμός API Call (με exponential backoff)
         async function handleGeminiApiCall(payload, maxRetries = 3) {
             const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -346,24 +462,53 @@
         }
 
 
-        // 4. Λειτουργίες Modal
+        // 5. Λειτουργίες Modal
         function openItemModal(item) {
             const titleElement = document.getElementById('item-modal-title');
             const saveButton = document.getElementById('save-item-btn');
+
+            // Προεπιλογή της φόρμας
+            itemListIdsSelect.querySelectorAll('option').forEach(opt => opt.selected = false);
+            itemPrioritySelect.value = 'low';
+            itemNotesInput.value = '';
 
             if (item) {
                 titleElement.textContent = 'Επεξεργασία Είδους';
                 saveButton.textContent = 'Ενημέρωση';
                 document.getElementById('item-id-input').value = item.id;
                 document.getElementById('item-name').value = item.name;
-                document.getElementById('item-list-id').value = item.listId;
+                itemPrioritySelect.value = item.priority || 'low';
+                itemNotesInput.value = item.notes || '';
+                
+                // Εμφάνιση κουμπιού διαγραφής και σύνδεση event
+                deleteItemBtn.classList.remove('hidden');
+                deleteItemBtn.onclick = (e) => {
+                    e.preventDefault();
+                    // Χρησιμοποιούμε την ενημερωμένη deleteItem που κλείνει το modal
+                    deleteItem(item.id); 
+                };
+                
+                // Επιλογή των λιστών στο multi-select
+                (item.listIds || []).forEach(listId => {
+                    const option = itemListIdsSelect.querySelector(`option[value="${listId}"]`);
+                    if (option) option.selected = true;
+                });
+
             } else {
                 titleElement.textContent = 'Προσθήκη Είδους';
                 saveButton.textContent = 'Αποθήκευση';
                 document.getElementById('item-id-input').value = '';
                 document.getElementById('item-name').value = '';
-                // Θέτει την default λίστα
-                document.getElementById('item-list-id').value = listSelector.value !== 'all' ? listSelector.value : (lists.length > 0 ? lists[0].id : '');
+                
+                // Απόκρυψη κουμπιού διαγραφής
+                deleteItemBtn.classList.add('hidden');
+                deleteItemBtn.onclick = null; // Καθαρισμός listener
+
+                // Προεπιλογή της τρέχουσας λίστας, αν φιλτράρουμε (μόνο μία)
+                if (currentListFilter !== 'all' && lists.some(l => l.id === currentListFilter)) {
+                    const option = itemListIdsSelect.querySelector(`option[value="${currentListFilter}"]`);
+                    if (option) option.selected = true;
+                }
             }
             itemModal.classList.remove('hidden');
         }
@@ -376,6 +521,8 @@
         function openListModal() {
             renderListsInModal();
             listModal.classList.remove('hidden');
+            listNameInput.focus(); // Focus στην φόρμα προσθήκης
+            toggleMenuDropdown(); // Κλείσιμο μενού
         }
 
         function closeListModal() {
@@ -383,7 +530,7 @@
             listForm.reset();
         }
         
-        function openRecipeModal(recipe) { // ΝΕΟ
+        function openRecipeModal(recipe) {
             recipeTitle.textContent = recipe.recipeName;
             recipeDescription.textContent = recipe.description;
             
@@ -391,14 +538,15 @@
             recipeInstructions.innerHTML = recipe.instructions.map(inst => `<li>${inst}</li>`).join('');
             
             recipeModal.classList.remove('hidden');
+            toggleMenuDropdown(); // Κλείσιμο μενού
         }
 
-        function closeRecipeModal() { // ΝΕΟ
+        function closeRecipeModal() {
             recipeModal.classList.add('hidden');
         }
 
 
-        // 5. Λειτουργίες Firestore - Είδη
+        // 6. Λειτουργίες Firestore - Είδη
         async function toggleItemChecked(itemId, isChecked) {
             try {
                 const itemRef = doc(db, ITEMS_COLLECTION_PATH, itemId);
@@ -421,27 +569,37 @@
 
             const itemId = document.getElementById('item-id-input').value;
             const name = document.getElementById('item-name').value.trim();
-            const listId = document.getElementById('item-list-id').value;
+            
+            // Λήψη πολλαπλών λιστών
+            // ΝΕΟ: Χρήση Array.from(select.options) για να πάρουμε όλες τις επιλεγμένες επιλογές
+            const listIds = Array.from(itemListIdsSelect.options)
+                               .filter(opt => opt.selected)
+                               .map(opt => opt.value)
+                               .filter(id => id); // Αφαίρεση τυχόν κενών τιμών
+            
+            // Λήψη Προτεραιότητας και Σημειώσεων
+            const priority = itemPrioritySelect.value;
+            const notes = itemNotesInput.value.trim();
 
-            if (name === "" || listId === "") {
-                showCustomAlert("Συμπληρώστε όλα τα πεδία.", 'error');
+            if (name === "" || listIds.length === 0) {
+                showCustomAlert("Συμπληρώστε το όνομα και επιλέξτε τουλάχιστον μία λίστα.", 'error');
                 return;
             }
 
             try {
+                const itemData = { name, listIds, priority, notes, timestamp: serverTimestamp() };
+
                 if (itemId) {
                     // Επεξεργασία
                     const itemRef = doc(db, ITEMS_COLLECTION_PATH, itemId);
-                    await updateDoc(itemRef, { name, listId, timestamp: serverTimestamp() });
+                    await updateDoc(itemRef, itemData);
                     showCustomAlert("Το είδος ενημερώθηκε επιτυχώς!", 'success');
                 } else {
                     // Προσθήκη
                     await addDoc(collection(db, ITEMS_COLLECTION_PATH), {
-                        name,
-                        listId,
+                        ...itemData,
                         checked: false,
                         userId: userId, // Ο χρήστης που το δημιούργησε
-                        timestamp: serverTimestamp()
                     });
                     showCustomAlert("Το είδος προστέθηκε επιτυχώς!", 'success');
                 }
@@ -458,6 +616,11 @@
             try {
                 await deleteDoc(doc(db, ITEMS_COLLECTION_PATH, itemId));
                 showCustomAlert("Το είδος διαγράφηκε!", 'success');
+                
+                // Εάν η διαγραφή έγινε από το modal επεξεργασίας, κλείστο
+                if (document.getElementById('item-id-input').value === itemId) {
+                    closeItemModal();
+                }
             } catch (error) {
                 console.error("Error deleting item:", error);
                 showCustomAlert("Σφάλμα κατά τη διαγραφή.", 'error');
@@ -482,6 +645,7 @@
             try {
                 await batch.commit();
                 showCustomAlert(`Διαγράφηκαν ${checkedItems.length} είδη!`, 'success');
+                toggleMenuDropdown(); // Κλείσιμο μενού
             } catch (error) {
                 console.error("Error deleting checked items:", error);
                 showCustomAlert("Σφάλμα κατά τη μαζική διαγραφή.", 'error');
@@ -489,7 +653,7 @@
         }
 
 
-        // 6. Λειτουργίες Firestore - Λίστες
+        // 7. Λειτουργίες Firestore - Λίστες
         async function handleListFormSubmit(event) {
             event.preventDefault();
             
@@ -498,16 +662,17 @@
                  return;
             }
 
-            const name = document.getElementById('list-name-input').value.trim();
+            const name = listNameInput.value.trim(); 
             if (name === "") return;
 
             try {
+                // FIX: Χρησιμοποιήθηκε addDoc για νέα λίστα
                 await addDoc(collection(db, LISTS_COLLECTION_PATH), {
                     name,
                     userId: userId, 
                     timestamp: serverTimestamp()
                 });
-                showCustomAlert("Η λίστα προστέθηκε!", 'success');
+                showCustomAlert(`Η λίστα '${name}' προστέθηκε!`, 'success');
                 listForm.reset();
             } catch (error) {
                 console.error("Error adding list:", error);
@@ -520,23 +685,35 @@
                 showCustomAlert("Δεν μπορείτε να διαγράψετε την τελευταία λίστα.", 'error');
                 return;
             }
-            if (!confirm("Προσοχή! Με τη διαγραφή της λίστας, θα διαγραφούν και ΟΛΑ τα είδη που ανήκουν σε αυτήν. Είστε σίγουροι;")) return;
+            if (!confirm("Προσοχή! Με τη διαγραφή της λίστας, όλα τα είδη που ανήκουν ΜΟΝΟ σε αυτήν τη λίστα θα διαγραφούν. Είστε σίγουροι;")) return;
 
             const batch = writeBatch(db);
             try {
-                // 1. Διαγραφή των ειδών που ανήκουν σε αυτή τη λίστα
-                const itemsQuery = query(collection(db, ITEMS_COLLECTION_PATH), where("listId", "==", listId));
+                // 1. Ενημέρωση ή Διαγραφή των ειδών
+                // FIX: Χρησιμοποιείται το query με where
+                const itemsQuery = query(collection(db, ITEMS_COLLECTION_PATH), where("listIds", "array-contains", listId));
                 const itemsSnapshot = await getDocs(itemsQuery);
-                itemsSnapshot.forEach(doc => {
-                    batch.delete(doc.ref);
+                
+                itemsSnapshot.forEach(docSnapshot => {
+                    const item = docSnapshot.data();
+                    const remainingListIds = (item.listIds || []).filter(id => id !== listId);
+
+                    if (remainingListIds.length === 0) {
+                        // Αν το είδος δεν ανήκει σε άλλη λίστα, διαγράφεται
+                        batch.delete(docSnapshot.ref);
+                    } else {
+                        // Αλλιώς, ενημερώνεται η λίστα λιστών
+                        batch.update(docSnapshot.ref, { listIds: remainingListIds });
+                    }
                 });
 
                 // 2. Διαγραφή της ίδιας της λίστας
                 const listRef = doc(db, LISTS_COLLECTION_PATH, listId);
+                // FIX: Χρησιμοποιήθηκε η deleteDoc μέσω batch
                 batch.delete(listRef);
 
                 await batch.commit();
-                showCustomAlert("Η λίστα και τα είδη της διαγράφηκαν!", 'success');
+                showCustomAlert("Η λίστα διαγράφηκε και τα είδη ενημερώθηκαν/διαγράφηκαν!", 'success');
                 
                 // Ενημέρωση φίλτρου αν διαγράφηκε η τρέχουσα λίστα
                 if (currentListFilter === listId) {
@@ -550,26 +727,26 @@
             }
         }
 
-        // 7. Λειτουργίες Render
+        // 8. Λειτουργίες Render
         function renderListsInModal() {
             listsDisplay.innerHTML = '';
             
             if (lists.length === 0) {
-                 listsDisplay.innerHTML = '<p class="text-gray-500 italic p-2">Δεν υπάρχουν λίστες.</p>';
+                 listsDisplay.innerHTML = '<p class="text-gray-500 dark:text-gray-400 italic p-2">Δεν υπάρχουν λίστες.</p>';
                  return;
             }
 
             lists.forEach(list => {
                 const listDiv = document.createElement('div');
-                listDiv.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg border border-gray-200';
+                listDiv.className = 'flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 transition-colors duration-300';
                 
                 const itemName = document.createElement('span');
                 itemName.textContent = list.name;
-                itemName.className = 'font-medium text-gray-800';
+                itemName.className = 'font-medium text-gray-800 dark:text-gray-100';
                 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = 'Διαγραφή';
-                deleteBtn.className = 'px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold hover:bg-red-200 transition duration-150';
+                deleteBtn.className = 'px-3 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full text-xs font-semibold hover:bg-red-200 dark:hover:bg-red-800 transition duration-150';
                 deleteBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     deleteList(list.id);
@@ -582,10 +759,10 @@
         }
         
         function updateListSelectors() {
-            // Ενημέρωση του φίλτρου λίστας (listSelector)
+            // Ενημέρωση του φίλτρου λίστας (listSelector) και του multi-select φόρμας
             const oldFilterValue = listSelector.value;
             listSelector.innerHTML = '<option value="all">Όλες οι λίστες</option>';
-            itemListIdSelect.innerHTML = '';
+            itemListIdsSelect.innerHTML = '';
 
             lists.forEach(list => {
                 const optionFilter = document.createElement('option');
@@ -594,10 +771,10 @@
                 listSelector.appendChild(optionFilter);
 
                 const optionModal = optionFilter.cloneNode(true);
-                itemListIdSelect.appendChild(optionModal);
+                itemListIdsSelect.appendChild(optionModal);
             });
             
-            // Διατήρηση της επιλεγμένης τιμής
+            // Διατήρηση της επιλεγμένης τιμής στο φίλτρο
             if (lists.some(l => l.id === oldFilterValue)) {
                 listSelector.value = oldFilterValue;
                 currentListFilter = oldFilterValue;
@@ -605,11 +782,32 @@
                  listSelector.value = 'all';
                  currentListFilter = 'all';
             }
+            
+            // Επανάκληση renderItems για να εφαρμοστεί το φίλτρο αν αλλάξει
+            renderItems(); 
+        }
+        
+        function getPriorityValue(priority) {
+            switch (priority) {
+                case 'urgent': return 3;
+                case 'medium': return 2;
+                case 'low': return 1;
+                default: return 0;
+            }
+        }
+
+        function getPriorityText(priority) {
+            switch (priority) {
+                case 'urgent': return 'Πολύ Επείγον';
+                case 'medium': return 'Επείγον';
+                case 'low': return 'Μόλις Μπορέσω';
+                default: return 'Χωρίς Προτεραιότητα';
+            }
         }
         
         function renderItems() {
             const filteredItems = items.filter(item => 
-                currentListFilter === 'all' || item.listId === currentListFilter
+                currentListFilter === 'all' || (item.listIds || []).includes(currentListFilter)
             );
 
             itemsContainer.innerHTML = '';
@@ -621,74 +819,95 @@
             emptyListMessage.classList.add('hidden');
 
             filteredItems.sort((a, b) => {
+                // 1. Προτεραιότητα (urgent > medium > low)
+                const priorityDiff = getPriorityValue(b.priority) - getPriorityValue(a.priority);
+                if (priorityDiff !== 0) return priorityDiff;
+                
+                // 2. Checked (unchecked > checked)
                 if (a.checked && !b.checked) return 1;
                 if (!a.checked && b.checked) return -1;
+
+                // 3. Timestamp (πιο πρόσφατο πρώτο)
                 return (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0);
             }).forEach(item => {
-                const listName = lists.find(l => l.id === item.listId)?.name || 'Άγνωστη Λίστα';
+                
+                const listNames = (item.listIds || [])
+                    .map(id => lists.find(l => l.id === id)?.name)
+                    .filter(name => name)
+                    .join(', ');
+
+                const priorityClass = `priority-${item.priority || 'low'}`;
 
                 const itemDiv = document.createElement('div');
-                itemDiv.className = `flex items-center justify-between p-4 rounded-xl shadow-sm cursor-pointer transition duration-200 ${item.checked ? 'bg-green-50/70 border-l-4 border-green-500 line-through text-gray-500' : 'bg-white hover:bg-gray-50 border-l-4 border-primary-500'}`;
+                itemDiv.className = `flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl shadow-sm cursor-pointer transition duration-200 ${item.checked ? 'bg-green-50/70 dark:bg-gray-700/50 border-l-4 border-green-500 line-through text-gray-500 dark:text-gray-400' : 'bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 border-l-4 border-primary-500'}`;
                 
+                // Κλικ σε οποιοδήποτε σημείο του div εκτός από το checkbox ανοίγει το modal επεξεργασίας
+                itemDiv.addEventListener('click', (e) => {
+                    // Αποφυγή triggering του click αν πατήθηκε το checkbox
+                    if (e.target.tagName !== 'INPUT' || e.target.type !== 'checkbox') {
+                        openItemModal(item);
+                    }
+                });
+
                 const leftSection = document.createElement('div');
-                leftSection.className = 'flex items-center space-x-3 flex-1 min-w-0';
+                leftSection.className = 'flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full';
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = item.checked;
-                checkbox.className = 'w-5 h-5 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500';
-                checkbox.addEventListener('change', () => toggleItemChecked(item.id, item.checked));
+                checkbox.className = 'mt-1 sm:mt-0 w-5 h-5 text-primary-600 bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-primary-500 flex-shrink-0';
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation(); // Σημαντικό για να μην ανοίξει το modal
+                    toggleItemChecked(item.id, item.checked);
+                });
 
                 const textContent = document.createElement('div');
-                textContent.className = 'min-w-0 flex-1';
+                textContent.className = 'min-w-0 flex-1 space-y-1';
+
+                const nameAndPriority = document.createElement('div');
+                nameAndPriority.className = 'flex items-center flex-wrap';
 
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = item.name;
-                nameSpan.className = 'block font-medium truncate';
+                nameSpan.className = 'font-medium truncate text-lg pr-2';
                 
-                const listTag = document.createElement('span');
-                listTag.textContent = listName;
-                listTag.className = 'block text-xs text-gray-400 mt-0.5';
+                const priorityTag = document.createElement('span');
+                priorityTag.textContent = getPriorityText(item.priority);
+                priorityTag.className = `px-2 py-0.5 rounded-full text-xs font-semibold border ${priorityClass} whitespace-nowrap`;
+                
+                nameAndPriority.appendChild(nameSpan);
+                nameAndPriority.appendChild(priorityTag);
 
-                textContent.appendChild(nameSpan);
-                textContent.appendChild(listTag);
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'flex flex-col sm:flex-row sm:space-x-3 text-sm';
+
+                const listTag = document.createElement('span');
+                listTag.textContent = `Λίστες: ${listNames || 'Καμία'}`;
+                listTag.className = 'block text-gray-500 dark:text-gray-400 mt-0.5';
+
+                if (item.notes) {
+                    const notesTag = document.createElement('span');
+                    notesTag.textContent = `Σημειώσεις: ${item.notes}`;
+                    notesTag.className = 'block text-gray-500 dark:text-gray-400 italic';
+                    detailsDiv.appendChild(notesTag);
+                }
+                detailsDiv.appendChild(listTag);
+
+                textContent.appendChild(nameAndPriority);
+                textContent.appendChild(detailsDiv);
+                
                 leftSection.appendChild(checkbox);
                 leftSection.appendChild(textContent);
                 
                 const actionsSection = document.createElement('div');
-                actionsSection.className = 'flex space-x-2 ml-4';
+                actionsSection.className = 'flex space-x-2 ml-auto sm:ml-4 mt-2 sm:mt-0 flex-shrink-0';
 
-                const editBtn = document.createElement('button');
-                editBtn.innerHTML = `
-                    <svg class="w-5 h-5 text-blue-500 hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-9-4l9-9m-7 7l-2 2"></path></svg>
-                `;
-                editBtn.title = 'Επεξεργασία';
-                editBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openItemModal(item);
-                });
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = `
-                    <svg class="w-5 h-5 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                `;
-                deleteBtn.title = 'Διαγραφή';
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteItem(item.id);
-                });
-
-                actionsSection.appendChild(editBtn);
-                actionsSection.appendChild(deleteBtn);
-                
                 itemDiv.appendChild(leftSection);
-                itemDiv.appendChild(actionsSection);
-
                 itemsContainer.appendChild(itemDiv);
             });
         }
         
-        // 8. ΝΕΑ Λειτουργία: Προτάσεις Συνταγών με Gemini LLM
+        // 9. ΝΕΑ Λειτουργία: Προτάσεις Συνταγών με Gemini LLM
         async function generateRecipe() {
             const ingredients = items.filter(item => !item.checked).map(item => item.name);
 
@@ -729,7 +948,7 @@
             };
             
             showCustomAlert("Ετοιμάζω μια συνταγή από τα είδη της λίστας σας...", 'info');
-            generateRecipeBtn.disabled = true;
+            generateRecipeAction.disabled = true;
 
             try {
                 const recipe = await handleGeminiApiCall(payload);
@@ -742,18 +961,21 @@
                 console.error("Recipe generation failed:", error);
                 showCustomAlert("Αποτυχία πρότασης συνταγής. Δοκιμάστε ξανά.", 'error');
             } finally {
-                generateRecipeBtn.disabled = false;
+                generateRecipeAction.disabled = false;
             }
         }
 
 
-        // 9. Εκκίνηση Firebase & Listeners
+        // 10. Εκκίνηση Firebase & Listeners
         function initializeFirebase() {
             try {
                 // setLogLevel('debug'); // Για debugging
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                
+                // Ενημέρωση κουμπιού Dark Mode στην αρχή
+                updateThemeButton(document.documentElement.classList.contains('dark'));
                 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
@@ -792,7 +1014,7 @@
                 lists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 // Δημιουργία default λίστας αν δεν υπάρχει καμία
-                if (lists.length === 0) {
+                if (lists.length === 0 && isAuthReady) {
                     addDoc(collection(db, LISTS_COLLECTION_PATH), {
                         name: "Γενικά Ψώνια",
                         userId: userId, 
@@ -800,10 +1022,11 @@
                     }).then(() => {
                         console.log("Default list created.");
                     }).catch(e => console.error("Could not create default list:", e));
-                } else {
-                    updateListSelectors();
-                    renderItems(); // Ενημέρωση ελέγχου για το φίλτρο
-                }
+                } 
+                
+                updateListSelectors();
+                renderListsInModal(); // Ενημέρωση modal αν είναι ανοιχτό
+
             }, (error) => {
                 console.error("Error listening to lists:", error);
             });
@@ -819,27 +1042,39 @@
         }
 
 
-        // 10. Event Listeners
+        // 11. Event Listeners
         window.addEventListener('load', initializeFirebase);
         
+        // Listeners για το φιλτράρισμα λίστας
         listSelector.addEventListener('change', () => {
             currentListFilter = listSelector.value;
             renderItems();
         });
         
-        deleteCheckedBtn.addEventListener('click', deleteCheckedItems);
-        generateRecipeBtn.addEventListener('click', generateRecipe); // ΝΕΟ Listener
+        // Listeners για το Μενού
+        menuBtn.addEventListener('click', toggleMenuDropdown);
+        manageListsAction.addEventListener('click', (e) => { e.preventDefault(); openListModal(); });
+        deleteCheckedAction.addEventListener('click', (e) => { e.preventDefault(); deleteCheckedItems(); });
+        generateRecipeAction.addEventListener('click', (e) => { e.preventDefault(); generateRecipe(); });
+        toggleThemeAction.addEventListener('click', (e) => { e.preventDefault(); toggleDarkMode(); });
         
+        // Κλείσιμο του μενού όταν κάνουμε κλικ οπουδήποτε αλλού
+        document.addEventListener('click', function(event) {
+            if (!menuBtn.contains(event.target) && !menuDropdown.contains(event.target) && !menuDropdown.classList.contains('hidden')) {
+                menuDropdown.classList.add('hidden');
+            }
+        });
+        
+        // Listeners για τα Modals
         addItemFab.addEventListener('click', () => openItemModal(null));
         itemForm.addEventListener('submit', handleItemFormSubmit);
         cancelItemBtn.addEventListener('click', closeItemModal);
         
-        manageListsBtn.addEventListener('click', openListModal);
+        // Listeners για τη Διαχείριση Λιστών (ΕΠΙΣΗΣ ΔΙΟΡΘΩΘΗΚΕ Η ΛΟΓΙΚΗ ΣΤΟ 7)
         listForm.addEventListener('submit', handleListFormSubmit);
         closeListModalBtn.addEventListener('click', closeListModal);
         
-        closeRecipeModalBtn.addEventListener('click', closeRecipeModal); // ΝΕΟ Listener
-        
+        closeRecipeModalBtn.addEventListener('click', closeRecipeModal);
         
     </script>
 </body>
